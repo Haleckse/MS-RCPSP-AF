@@ -114,11 +114,11 @@ def verify_solution(data, schedule_dict, expected_makespan):
     # AFFICHAGES
     # ==========================================
     print("\n" + "="*50)
-    print(" RÉSULTAT DE LA VÉRIFICATION INDÉPENDANTE")
+    print(" ❎ RÉSULTAT DE LA VÉRIFICATION INDÉPENDANTE")
     print("="*50)
     
     if errors:
-        print("SOLUTION INVALIDE, Erreurs détectées :\n")
+        print(" ❌ SOLUTION INVALIDE, Erreurs détectées :\n")
         for e in errors:
             print("  -", e)
         return False
