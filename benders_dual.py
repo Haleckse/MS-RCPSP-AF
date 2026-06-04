@@ -12,17 +12,13 @@ from utils import parse_instance
 
 import json
 
-# =============================================================================
-# CONFIGURATION CPLEX 
-# =============================================================================
 
 context.solver.agent = 'local'
 context.solver.local.execfile = '/home/atsan/cplex/cpoptimizer/bin/x86-64_linux/cpoptimizer'
 
 
-# =============================================================================
-# MASTER PROBLEM (ORDONNANCEMENT)
-# =============================================================================
+# MASTER PROBLEM (SCHEDULING)
+
 def solve_master_problem(data, timelimit, benders_cuts=None):
     """
     Ne gère que le temps et les capacités globales.
@@ -45,17 +41,13 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
     for p, s in zip(data['pred'], data['succ']):
         successors[p - 1].append(s - 1)
 
-    # ---------------------------------------------------------
-    # CALCUL DES RESSOURCES EN SKILLS
-    # ---------------------------------------------------------
+    # SKILL RESSOURCE COMPUTING
     
     # Nombre total de travailleurs qui maîtrisent la compétence l 
     skill_resource = [sum(skills_per_worker[o][l] for o in range(nb_worker)) for l in range(nb_skills)]
     
 
-    # ---------------------------------------------------------
-    # MODÈLE 
-    # ---------------------------------------------------------
+    # MODEL
 
     mdl = CpoModel()
 
@@ -76,13 +68,13 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
 
     # --- CONTRAINTES DE CADRAGE DES SOLUTIONS DU MAITRE ---
 
-    # A chaque t, on n'utilise pas plus de worker que il y en a de dispo 
+    # On n'utilise pas plus de worker que il y en a de dispo 
     worker_usage_list = [mdl.pulse(act[i], number_of_worker[i]) for i in range(nb_tasks) if durations_tasks[i] > 0 and number_of_worker[i] > 0]
     if worker_usage_list:
         worker_usage = mdl.sum(worker_usage_list)
         mdl.add(worker_usage <= nb_worker)
 
-    # A chaque t, on n'utilise pas plus de compétence que il y en a de dispo 
+    # On n'utilise pas plus de compétence que il y en a de dispo 
     for l in range(nb_skills):
         skill_usage_list = [mdl.pulse(act[i], skills_requirement[i][l]) for i in range(nb_tasks) if durations_tasks[i] > 0 and skills_requirement[i][l] > 0]
         if skill_usage_list:
@@ -92,29 +84,32 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
     obj = mdl.max([mdl.end_of(t) for t in act])
 
     # ---------------------------------------------------------
-    # INJECTION DES COUPES DE BENDERS
-    # |W_S| >= Sum(D_l)
+    # INJECTION DES COUPES DE BENDERS (Formule A_S et a_{i,l})
     # ---------------------------------------------------------
     if benders_cuts:
         for cut_idx, cut_info in enumerate(benders_cuts):
-
-            task_demands = cut_info['task_demands']
-            W_S = cut_info['W_S']
             
-            # Capacité de W_S
-            cap_WS = len(W_S)
+            A_S = cut_info['A_S']        # Sous-ensemble des tâches coupables
+            S = cut_info['S']       # Sous-ensemble des compétences en conflit
+            WS_capacity = cut_info['WS_capacity']  # |W_S|
             
-            # Création de la demande cumulée basée sur la tâche entière
             conflict_pulses = []
-            for i, demand in task_demands.items():
-                conflict_pulses.append(mdl.pulse(act[i], demand))
+            
+            # OBoucle sur les taches de A_S 
+            for i in A_S:
+                if durations_tasks[i] > 0:
+                    # On calcule la somme des besoins pour les compétences en conflit S
+                    demand_for_S = sum(skills_requirement[i][l] for l in S)
                     
+                    if demand_for_S > 0:
+                        conflict_pulses.append(mdl.pulse(act[i], demand_for_S))
+                        
             if conflict_pulses:
-                cut_usage = mdl.sum(conflict_pulses)
+                cut_skill_demand = mdl.sum(conflict_pulses)
+                mdl.add(cut_skill_demand <= WS_capacity)
                 
-                mdl.add(cut_usage <= cap_WS)
+        print(f" -> {len(benders_cuts)} Coupe(s) injectée(s) au Maître.")
                 
-        print(f" -> {len(benders_cuts)} Coupe(s) Min-Cut injectée(s) au Maître.")
 
     mdl.add(mdl.minimize(obj))
 
@@ -141,10 +136,6 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
 # SUBPROBLEM (AFFECTATION)
 # =============================================================================
 def solve_subproblem(data, schedule):
-    """
-    Résout le problème d'affectation par flot maximum.
-    Si infaisable, extrait la coupe exacte via la Dualité (Min-Cut) 
-    """
     nb_tasks = data['nActs']
     nb_skills = data['nSkills']
     nb_worker = data['nResources']
@@ -162,70 +153,45 @@ def solve_subproblem(data, schedule):
         G.add_node('SINK')
         
         total_demand = 0
-        post_to_task = {} 
+        node_to_task_skill = {} 
 
-        # Décomposition en besoin unitaire de chaque taches
         for i in active_tasks:
-            poste_id = 0 
             for l in range(nb_skills):
-                for _ in range(skills_requirement[i][l]):
-                    node_poste = f'Task_{i}_Post_{poste_id}_Skill_{l}'
-                    G.add_node(node_poste)
-                    G.add_edge(node_poste, 'SINK', capacity=1)
-                    post_to_task[node_poste] = i
-                    poste_id += 1
-                    total_demand += 1
+                req = skills_requirement[i][l]
+                if req > 0:
+                    node_name = f'Task_{i}_Skill_{l}'
+                    G.add_node(node_name)
+                    G.add_edge(node_name, 'SINK', capacity=req)
+                    node_to_task_skill[node_name] = {'task': i, 'skill': l, 'demand': req}
+                    total_demand += req
                     
-        # Noeuds workers
         for o in range(nb_worker):
             worker_node = f'Worker_{o}'
             G.add_node(worker_node)
             G.add_edge('SOURCE', worker_node, capacity=1)
-                
             for i in active_tasks:
-                poste_id = 0
                 for l in range(nb_skills):
-                    for _ in range(skills_requirement[i][l]):
-                        if skills_per_worker[o][l] == 1:
-                            node_poste = f'Task_{i}_Post_{poste_id}_Skill_{l}'
-                            G.add_edge(worker_node, node_poste, capacity=float('inf'))
-                        poste_id += 1
+                    if skills_requirement[i][l] > 0 and skills_per_worker[o][l] == 1:
+                        node_name = f'Task_{i}_Skill_{l}'
+                        G.add_edge(worker_node, node_name, capacity=float('inf'))
                             
-        # Trouver flot max 
         flow_value, _ = nx.maximum_flow(G, 'SOURCE', 'SINK')
         
-        # Si affectation impossible : trouver coupe min 
         if flow_value < total_demand:
             cut_value, partition = nx.minimum_cut(G, 'SOURCE', 'SINK')
             reachable, non_reachable = partition
-            
             P_NR = [n for n in non_reachable if n.startswith('Task_')]
             
-            required_skills = set()
-            for p in P_NR:
-                l = int(p.split('_Skill_')[1])
-                required_skills.add(l)
-                
-            W_S = [o for o in range(nb_worker) if any(skills_per_worker[o][l] == 1 for l in required_skills)]
+            A_S = list(set(node_to_task_skill[n]['task'] for n in P_NR))
+            S = list(set(node_to_task_skill[n]['skill'] for n in P_NR))
+            W_S = [o for o in range(nb_worker) if any(skills_per_worker[o][l] == 1 for l in S)]
             
-            task_demands = {}
-            for p in P_NR:
-                task_id = post_to_task[p]
-                task_demands[task_id] = task_demands.get(task_id, 0) + 1
-                
-            cut_info = {
-                'task_demands': task_demands,
-                'W_S': W_S
-            }
-            
-            return False, cut_info, t
+            return False, {'A_S': A_S, 'S': S, 'WS_capacity': len(W_S)}, t
             
     return True, None, None
 
 
-# =============================================================================
 # FONCTION DE COMMUNICATION 
-# =============================================================================
 def run_benders_lbbd(filepath, timelimit):
     data = parse_instance(filepath) 
     
@@ -281,9 +247,7 @@ def run_benders_lbbd(filepath, timelimit):
             
         iteration += 1
 
-# =============================================================================
 # PROGRAMME PRINCIPAL
-# =============================================================================
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python main.py <chemin_vers_instance> <timelimit>")
@@ -292,4 +256,4 @@ if __name__ == "__main__":
     filepath = sys.argv[1]
     timelimit = int(sys.argv[2])
     
-    run_benders_lbbd("datas/instances/" + filepath, timelimit)
+    run_benders_lbbd(filepath, timelimit)

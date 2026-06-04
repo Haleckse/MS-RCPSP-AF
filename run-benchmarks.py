@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 
 from cp import solve_cp  
-from benders_dual import run_benders_lbbd  
+from benders import run_benders_lbbd  
 from checker import verify_solution
 from utils import parse_instance
 import json
@@ -37,7 +37,7 @@ def run_all_benchmarks(method, instances_folder, timelimit):
         # ===============
         if method in ['cp', 'both']:
             print(" -> Lancement CP Classique...")
-            msol, par, InTech = solve_cp(filename, timelimit, display_gantt=False)
+            msol, InTech = solve_cp(filepath, timelimit, display_gantt=False)
 
             if msol:
                 makespan = msol.get_objective_values()[0]
