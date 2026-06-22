@@ -53,7 +53,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
 
     # awo_{w,i,l,v} 
     awo = {}
-    for w in range(nb_worker): # index w (au lieu de o)
+    for w in range(nb_worker): 
         for i in range(nb_tasks):
             if durations_tasks[i] > 0:
                 for l in range(nb_skills):
