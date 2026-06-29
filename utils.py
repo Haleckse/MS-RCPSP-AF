@@ -83,64 +83,66 @@ def parse_instance(file_path):
 
 
 
-def plot_gantt(msol, nb_tasks, nb_worker, nb_skills, durations_tasks, V, itvs, par, InTech):
+def plot_gantt_lbbd(data, schedule, assignments, makespan):
     """
-    Génère, affiche et sauvegarde le diagramme de Gantt du MS-RCPSP-AF
+    Génère et affiche le diagramme de Gantt à partir des dictionnaires LBBD (avec Skills).
     """
-    if not msol:
-        print("[Graphique] Aucune solution fournie. Impossible de tracer le Gantt.")
-        return
+    nb_tasks = data['nActs']
+    nb_worker = data['nResources']
+    durations_tasks = data['dur']
 
-    # --- CONFIGURATION DU GRAPHIQUE GANTT ---
     fig, ax = plt.subplots(figsize=(14, 8))
     
-    random.seed(42)
-    colors_worker = [f"#{random.randint(0, 0xFFFFFF):06x}" for _ in range(nb_worker)]
+    # Couleurs personnalisées
+    custom_colors = ['#1f77b4', '#d62728', '#9467bd'] 
+    colors_worker = [custom_colors[o % len(custom_colors)] for o in range(nb_worker)]
     
-    for i in range(nb_tasks):
-        if durations_tasks[i] > 0:
-            t_sol = msol.get_var_solution(itvs[i])
-            task_start = t_sol.get_start()
-            task_end = t_sol.get_end()
+    for task_id in range(nb_tasks):
+        if durations_tasks[task_id] > 0 and task_id in schedule:
+            task_times = schedule[task_id]
+            if not task_times: continue
             
-            # Tracé de l'enveloppe globale
-            ax.barh(y=i, width=durations_tasks[i], left=task_start, 
+            task_start = min(task_times)
+            
+            # Tracé de l'enveloppe globale grise
+            ax.barh(y=task_id, width=durations_tasks[task_id], left=task_start, 
                     color='#eaeaea', edgecolor='gray', alpha=0.4, height=0.6)
             
-            # Analyse heure par heure
-            for v in V[i]:
-                p_sol = msol.get_var_solution(par[i][v])
-                p_start = p_sol.get_start()
-                p_end = p_sol.get_end()
-                
-                active_workers = []
-                for o in range(nb_worker):
-                    for l in range(nb_skills):
-                        # LA CORRECTION EST ICI : On vérifie si la clé existe dans le dictionnaire
-                        if (o, i, l, v) in InTech:
-                            w_sol = msol.get_var_solution(InTech[(o, i, l, v)])
-                            # Filtre strict de synchronisation
-                            if w_sol.is_present() and w_sol.get_start() == p_start and w_sol.get_end() == p_end:
-                                # On évite d'ajouter le même worker deux fois s'il utilise 2 skills en même temps
-                                if o not in active_workers:
-                                    active_workers.append(o)
-                
-                # Sous-blocs colorés
-                if active_workers:
-                    num_w = len(active_workers)
-                    height_sub = 0.55 / num_w 
+            # Analyse heure par heure et tracé des travailleurs
+            for t in task_times:
+                if t in assignments and task_id in assignments[t]:
                     
-                    for idx, worker_id in enumerate(active_workers):
-                        y_pos = i - 0.275 + (idx * height_sub) + (height_sub / 2)
-                        ax.barh(y=y_pos, width=1, left=p_start, height=height_sub, 
-                                color=colors_worker[worker_id], edgecolor='white', linewidth=0.5)
+                    # On regroupe les compétences par travailleur pour cette heure
+                    # format: { worker_id: [skill_1, skill_2] }
+                    active_workers_dict = {}
+                    for w_id, s_id in assignments[t][task_id]:
+                        if w_id not in active_workers_dict:
+                            active_workers_dict[w_id] = []
+                        active_workers_dict[w_id].append(s_id)
+                    
+                    if active_workers_dict:
+                        num_w = len(active_workers_dict)
+                        height_sub = 0.55 / num_w 
+                        
+                        for idx, (worker_id, skills) in enumerate(active_workers_dict.items()):
+                            y_pos = task_id - 0.275 + (idx * height_sub) + (height_sub / 2)
+                            
+                            # Barre de couleur du worker
+                            ax.barh(y=y_pos, width=1, left=t, height=height_sub, 
+                                    color=colors_worker[worker_id], edgecolor='white', linewidth=0.5)
+                            
+                            # NOUVEAU : Ajout du texte de la compétence (ex: S1, S2...)
+                            # On ajoute +1 pour que ça affiche S1 au lieu de S0
+                            skills_str = "+".join([f"S{s+1}" for s in skills])
+                            ax.text(t + 0.5, y_pos, skills_str, va='center', ha='center', 
+                                    fontsize=6, color='white', fontweight='bold')
 
-            ax.text(task_start - 0.5, i, f"Tâche {i:2d}", va='center', ha='right', fontsize=9, fontweight='bold')
+            ax.text(task_start - 0.5, task_id, f"Tâche {task_id:2d}", va='center', ha='right', fontsize=9, fontweight='bold')
 
     # --- PERSONNALISATION GRAPHIQUE ---
     ax.set_xlabel("Temps (Heures / Périodes)", fontsize=12, fontweight='bold', labelpad=10)
     ax.set_ylabel("Identifiant des Tâches", fontsize=12, fontweight='bold', labelpad=10)
-    ax.set_title(f"MS-RCPSP-AF : Ordonnancement Continu et Flexibilité d'Affectation\nMakespan Optimal Trouvé = {msol.get_objective_value()} heures", 
+    ax.set_title(f"MS-RCPSP-AF (LBBD) : Ordonnancement Continu et Flexibilité\nMakespan Optimal Trouvé = {makespan} heures", 
                  fontsize=14, fontweight='bold', pad=20)
     
     ax.set_yticks(range(nb_tasks))
@@ -155,8 +157,8 @@ def plot_gantt(msol, nb_tasks, nb_worker, nb_skills, durations_tasks, V, itvs, p
 
     plt.tight_layout()
     
-    output_filename = "gantt_mspsp_af.png"
+    output_filename = "gantt_mspsp_af_lbbd.png"
     plt.savefig(output_filename, dpi=300)
     print(f"\n[Graphique] Le diagramme de Gantt a été généré et sauvegardé avec succès : '{output_filename}'")
     
-    plt.show() 
+    plt.show()

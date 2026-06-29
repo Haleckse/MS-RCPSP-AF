@@ -1,189 +1,93 @@
 import sys
 import networkx as nx
-import re
 import random
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from docplex.cp.config import context
 from docplex.cp.model import CpoModel
-
 import time
-from utils import parse_instance
-
 import json
+import utils # Assure-toi que utils.parse_instance est bien défini ici ou adapte l'import
 
-
+# Configuration du solveur IBM CPLEX
 context.solver.agent = 'local'
 context.solver.local.execfile = '/home/atsan/cplex/cpoptimizer/bin/x86-64_linux/cpoptimizer'
 
-# =============================================================================
-# HEURISTIQUE DE DÉMARRAGE (WARM-START) CORRIGÉE AVEC FLOT MAX
-# =============================================================================
-def get_heuristic_makespan(data):
-    """
-    Génère une borne supérieure rapide via un algorithme glouton (Serial Generation Scheme).
-    Utilise le Flot Max pour garantir qu'il ne se coince pas dans des choix sous-optimaux.
-    """
-    nb_tasks = data['nActs']
-    durations = data['dur']
-    sreq = data['sreq']
-    mastery = data['mastery']
-    nb_worker = data['nResources']
 
-    # 1. Graphe des précédences pour le tri topologique
-    succs = {i: [] for i in range(nb_tasks)}
-    preds = {i: [] for i in range(nb_tasks)}
-    for p, s in zip(data['pred'], data['succ']):
-        succs[p-1].append(s-1)
-        preds[s-1].append(p-1)
-
-    # 2. Tri topologique
-    in_degree = {i: len(preds[i]) for i in range(nb_tasks)}
-    queue = [i for i in range(nb_tasks) if in_degree[i] == 0]
-    topo_order = []
-
-    while queue:
-        curr = queue.pop(0)
-        topo_order.append(curr)
-        for s in succs[curr]:
-            in_degree[s] -= 1
-            if in_degree[s] == 0:
-                queue.append(s)
-
-    # 3. Planification
-    task_finish = {i: 0 for i in range(nb_tasks)}
-    worker_free_time = {w: 0 for w in range(nb_worker)}
-
-    for i in topo_order:
-        if durations[i] == 0:
-            task_finish[i] = max([task_finish[p] for p in preds[i]] + [0])
-            continue
-
-        min_start = max([task_finish[p] for p in preds[i]] + [0])
-        t = min_start
-        total_demand = sum(sreq[i])
-
-        if total_demand > nb_worker:
-            return None # Sécurité: Tâche impossible
-
-        while True:
-            # On utilise le Flot Max pour l'affectation à l'instant t
-            G = nx.DiGraph()
-            G.add_node('SOURCE')
-            G.add_node('SINK')
-            
-            for l in range(data['nSkills']):
-                if sreq[i][l] > 0:
-                    G.add_edge(f'Skill_{l}', 'SINK', capacity=sreq[i][l])
-
-            for w in range(nb_worker):
-                if worker_free_time[w] <= t:
-                    G.add_edge('SOURCE', f'Worker_{w}', capacity=1)
-                    for l in range(data['nSkills']):
-                        if sreq[i][l] > 0 and mastery[w][l] == 1:
-                            G.add_edge(f'Worker_{w}', f'Skill_{l}', capacity=1)
-
-            flow_value, flow_dict = nx.maximum_flow(G, 'SOURCE', 'SINK')
-
-            if flow_value == total_demand:
-                # Équipe trouvée ! On bloque les ouvriers
-                for w in range(nb_worker):
-                    if worker_free_time[w] <= t and flow_dict.get('SOURCE', {}).get(f'Worker_{w}', 0) > 0:
-                        worker_free_time[w] = t + durations[i]
-                task_finish[i] = t + durations[i]
-                break
-            else:
-                t += 1 
-                # Filet de sécurité: Si le temps t dépasse la dispo de TOUS les ouvriers 
-                # et que ça échoue encore, la tâche est impossible avec ces compétences.
-                if all(worker_free_time[w] <= t for w in range(nb_worker)):
-                    return None
-
-    return max(task_finish.values())
-
-
-# =============================================================================
+# ==============================================================================
 # MASTER PROBLEM (SCHEDULING) 
-# =============================================================================
+# ==============================================================================
+
 def solve_master_problem(data, timelimit, benders_cuts=None):
+    """
+    Ne gère que le temps et les capacités globales (Relaxed CP model).
+    """
     # SETS 
-    nb_tasks = data['nActs']          
-    nb_skills = data['nSkills']       
-    nb_worker = data['nResources']    
-    nb_ressource = data.get('nb_ressource', 0) 
+    nb_tasks = data['nActs']          # |A| : Set of activities (i)
+    nb_skills = data['nSkills']       # |L| : Set of skills (l)
+    nb_worker = data['nResources']    # |W| : Set of MS resources (w)
+    nb_ressource = data.get('nb_ressource', 0) # |CR| : Set of cumulative resources (k)
     
     # PARAMETERS 
-    durations_tasks = data['dur']     
-    horizon = sum(durations_tasks) + 10  
-    skills_requirement = data['sreq'] 
-    skills_per_worker = data['mastery'] 
-    ressource_requirement = data.get('ressource_requirement', [[0]*nb_ressource for _ in range(nb_tasks)]) 
-    ressource_capa = data.get('ressource_capa', []) 
+    durations_tasks = data['dur']     # p_i : Processing time of activity i
+    skills_requirement = data['sreq'] # a_{i,l} : Number of workers mastering skill l required for act i
+    skills_per_worker = data['mastery'] # m_{w,l} : 1 if worker w masters skill l
+    ressource_requirement = data.get('ressource_requirement', [[0]*nb_ressource for _ in range(nb_tasks)]) # b_{i,k}
+    ressource_capa = data.get('ressource_capa', []) # B_k
     
-    number_of_worker = [sum(row) for row in skills_requirement] 
+    number_of_worker = [sum(row) for row in skills_requirement] # q_i : Minimum total number of workers for act i
 
-    successors = [[] for _ in range(nb_tasks)] 
+    successors = [[] for _ in range(nb_tasks)] # E : Precedence constraints
     for p, s in zip(data['pred'], data['succ']):
         successors[p - 1].append(s - 1)
 
+    # N_l : Total number of workers mastering skill l
     skill_resource = [sum(skills_per_worker[w][l] for w in range(nb_worker)) for l in range(nb_skills)]
     
-    # --- CALCUL DE L'HEURISTIQUE (WARM-START) ---
-    if not benders_cuts: 
-        borne_heuristique = get_heuristic_makespan(data)
-        if borne_heuristique:
-            print(f" -> [HEURISTIQUE] Solution réalisable trouvée : Makespan <= {borne_heuristique}")
-        else:
-            print(" -> [HEURISTIQUE] Échec (Instance potentiellement complexe), lancement normal.")
-    else:
-        borne_heuristique = None
-
     # MODEL
     mdl = CpoModel()
 
     # DECISION VARIABLES
+    # act_i : Interval variable for the global execution of activity i
     act = [mdl.interval_var(size=durations_tasks[i], name=f"act{i}") for i in range(nb_tasks)]
 
+    # CONSTRAINTS
+    # endBeforeStart(act_i, act_m) for (i,m) in E
     for i in range(nb_tasks):
         for succ in successors[i]:
             mdl.add(mdl.end_before_start(act[i], act[succ]))
 
+    # sum(pulse(act_i, b_{i,k})) <= B_k
     for k in range(nb_ressource):
         ressources = [mdl.pulse(act[i], ressource_requirement[i][k]) for i in range(nb_tasks) if ressource_requirement[i][k] > 0]
         if ressources:
             mdl.add(mdl.sum(ressources) <= int(ressource_capa[k]))
 
-
+    # sum(pulse(act_i, q_i)) <= |W|
     worker_usage_list = [mdl.pulse(act[i], number_of_worker[i]) for i in range(nb_tasks) if durations_tasks[i] > 0 and number_of_worker[i] > 0]
     if worker_usage_list:
         worker_usage = mdl.sum(worker_usage_list)
         mdl.add(worker_usage <= nb_worker)
 
+    # sum(pulse(act_i, a_{i,l})) <= N_l
     for l in range(nb_skills):
         skill_usage_list = [mdl.pulse(act[i], skills_requirement[i][l]) for i in range(nb_tasks) if durations_tasks[i] > 0 and skills_requirement[i][l] > 0]
         if skill_usage_list:
             skill_usage = mdl.sum(skill_usage_list)
             mdl.add(skill_usage <= skill_resource[l])
 
+    # C_max >= act_i.end AND min C_max
     obj = mdl.max([mdl.end_of(t) for t in act])
-
-    # --- INJECTION DE LA BORNE DANS LE SOLVEUR ---
-    if borne_heuristique:
-        mdl.add(obj <= borne_heuristique)
 
     # ADDING BENDERS CUT
     if benders_cuts:
         for cut_idx, cut_info in enumerate(benders_cuts):
-            
-            A_S = cut_info['A_S']                  
-            S = cut_info['S']                      
-            WS_capacity = cut_info['WS_capacity']  
+            A_S = cut_info['A_S']                  # {A}_S : minimal conflicting subset of tasks
+            S = cut_info['S']                      # S     : corresponding set of saturated skills
+            WS_capacity = cut_info['WS_capacity']  # |W_S| : capacity of the qualified workforce
             
             conflict_pulses = []
-            
-            # for i in A_S: (Original version)
             for i in range(nb_tasks):
-
                 if durations_tasks[i] > 0:
                     demand_for_S = sum(skills_requirement[i][l] for l in S) 
                     if demand_for_S > 0:
@@ -201,7 +105,7 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
     msol = mdl.solve(TimeLimit=timelimit, LogVerbosity='Quiet')
 
     if msol:
-        makespan = msol.get_objective_values()[0] 
+        makespan = msol.get_objective_values()[0] # C_max
         schedule = {}
         
         for i in range(nb_tasks):
@@ -214,18 +118,23 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
         return None, None, None
 
 
-# =============================================================================
+# ==============================================================================
 # SUBPROBLEM (AFFECTATION) 
-# =============================================================================
+# ==============================================================================
+
 def solve_subproblem(data, schedule):
     nb_tasks = data['nActs']
     nb_skills = data['nSkills']
     nb_worker = data['nResources']
-    skills_requirement = data['sreq'] 
-    skills_per_worker = data['mastery'] 
+    skills_requirement = data['sreq'] # a_{i,l}
+    skills_per_worker = data['mastery'] # m_{w,l}
 
     max_time = max([max(times) + 1 for times in schedule.values() if times])
     
+    # Dictionnaire pour stocker l'affectation finale (heure par heure)
+    assignments = {} 
+    
+    # Subproblem is solved for each time period t independently (Allocation Flexibility)
     for t in range(max_time):
         active_tasks = [i for i in range(nb_tasks) if i in schedule and t in schedule[i]]
         if not active_tasks: continue
@@ -237,6 +146,7 @@ def solve_subproblem(data, schedule):
         total_demand = 0
         node_to_task_skill = {} 
 
+        # Build demand side of the bi-part graph 
         for i in active_tasks:
             for l in range(nb_skills):
                 req = skills_requirement[i][l] 
@@ -247,6 +157,7 @@ def solve_subproblem(data, schedule):
                     node_to_task_skill[node_name] = {'task': i, 'skill': l, 'demand': req}
                     total_demand += req
                     
+        # Build supply side of the bi-part graph
         for w in range(nb_worker):
             worker_node = f'Worker_{w}'
             G.add_node(worker_node)
@@ -258,30 +169,128 @@ def solve_subproblem(data, schedule):
                         node_name = f'Task_{i}_Skill_{l}'
                         G.add_edge(worker_node, node_name, capacity=float('inf'))
                             
-        flow_value, _ = nx.maximum_flow(G, 'SOURCE', 'SINK')
+        # Calcul du flot maximum et récupération du détail du flot
+        flow_value, flow_dict = nx.maximum_flow(G, 'SOURCE', 'SINK')
         
+        # Subproblem is infeasible if max flow < total demand (D_l)
         if flow_value < total_demand:
+            # Generate Logic-Based Benders Cut via Min-Cut 
             cut_value, partition = nx.minimum_cut(G, 'SOURCE', 'SINK')
             reachable, non_reachable = partition 
             
+            # Extract nodes on the Sink side of the cut (where d_{s,l} = 0)
             P_NR = [n for n in non_reachable if n.startswith('Task_')]
             
+            # {A}_S : Minimal conflicting subset of tasks
             A_S = list(set(node_to_task_skill[n]['task'] for n in P_NR))
+            # S : Corresponding set of saturated skills
             S = list(set(node_to_task_skill[n]['skill'] for n in P_NR))
+            # W_S : Subset of workers mastering at least one skill in S
             W_S = [w for w in range(nb_worker) if any(skills_per_worker[w][l] == 1 for l in S)]
             
-            return False, {'A_S': A_S, 'S': S, 'WS_capacity': len(W_S)}, t
+            # Return the cut informations
+            return False, {'A_S': A_S, 'S': S, 'WS_capacity': len(W_S)}, t, None
             
-    return True, None, None
+        else:
+            # Sauvegarde des affectations heure par heure
+            assignments[t] = {}
+            for w in range(nb_worker):
+                worker_node = f'Worker_{w}'
+                if worker_node in flow_dict:
+                    for target, flow in flow_dict[worker_node].items():
+                        # Si le flot passe, le travailleur 'w' est affecté à la tâche cible
+                        if flow > 0 and target.startswith('Task_'):
+                            task_id = node_to_task_skill[target]['task']
+                            if task_id not in assignments[t]:
+                                assignments[t][task_id] = []
+                            assignments[t][task_id].append(w)
+            
+    return True, None, None, assignments
 
 
-# =============================================================================
-# MAIN LOOP
-# =============================================================================
-def run_benders_lbbd(filepath, timelimit):
-    data = parse_instance(filepath) 
+# ==============================================================================
+# GANTT PLOTTER (LBBD)
+# ==============================================================================
+
+def plot_gantt_lbbd(data, schedule, assignments, makespan):
+    """
+    Génère et affiche le diagramme de Gantt à partir des dictionnaires LBBD.
+    """
+    nb_tasks = data['nActs']
+    nb_worker = data['nResources']
+    durations_tasks = data['dur']
+
+    fig, ax = plt.subplots(figsize=(14, 8))
     
-    benders_cuts = [] 
+    random.seed(42)
+    colors_worker = [f"#{random.randint(0, 0xFFFFFF):06x}" for _ in range(nb_worker)]
+    
+    for task_id in range(nb_tasks):
+        if durations_tasks[task_id] > 0 and task_id in schedule:
+            task_times = schedule[task_id]
+            if not task_times: continue
+            
+            task_start = min(task_times)
+            
+            # Tracé de l'enveloppe globale
+            ax.barh(y=task_id, width=durations_tasks[task_id], left=task_start, 
+                    color='#eaeaea', edgecolor='gray', alpha=0.4, height=0.6)
+            
+            # Analyse heure par heure
+            for t in task_times:
+                if t in assignments and task_id in assignments[t]:
+                    # Filtre anti-doublon (si un worker utilise 2 skills sur la même tâche)
+                    active_workers = list(set(assignments[t][task_id]))
+                    
+                    if active_workers:
+                        num_w = len(active_workers)
+                        height_sub = 0.55 / num_w 
+                        
+                        for idx, worker_id in enumerate(active_workers):
+                            y_pos = task_id - 0.275 + (idx * height_sub) + (height_sub / 2)
+                            ax.barh(y=y_pos, width=1, left=t, height=height_sub, 
+                                    color=colors_worker[worker_id], edgecolor='white', linewidth=0.5)
+
+            ax.text(task_start - 0.5, task_id, f"Tâche {task_id:2d}", va='center', ha='right', fontsize=9, fontweight='bold')
+
+    # --- PERSONNALISATION GRAPHIQUE ---
+    ax.set_xlabel("Temps (Heures / Périodes)", fontsize=12, fontweight='bold', labelpad=10)
+    ax.set_ylabel("Identifiant des Tâches", fontsize=12, fontweight='bold', labelpad=10)
+    ax.set_title(f"MS-RCPSP-AF (LBBD) : Ordonnancement Continu et Flexibilité\nMakespan Optimal Trouvé = {makespan} heures", 
+                 fontsize=14, fontweight='bold', pad=20)
+    
+    ax.set_yticks(range(nb_tasks))
+    ax.set_yticklabels([f"T{i}" for i in range(nb_tasks)], fontsize=9)
+    ax.set_ylim(-1, nb_tasks)
+    
+    ax.grid(axis='x', linestyle='--', alpha=0.5)
+    ax.set_axisbelow(True)
+
+    legend_patches = [mpatches.Patch(color=colors_worker[o], label=f"Worker {o}") for o in range(nb_worker)]
+    ax.legend(handles=legend_patches, bbox_to_anchor=(1.02, 1), loc='upper left', title="Équipe (Workers)", borderaxespad=0.)
+
+    plt.tight_layout()
+    
+    output_filename = "gantt_mspsp_af_lbbd.png"
+    plt.savefig(output_filename, dpi=300)
+    print(f"\n[Graphique] Le diagramme de Gantt a été généré et sauvegardé avec succès : '{output_filename}'")
+    
+    plt.show()
+
+
+# ==============================================================================
+# MAIN LOOP
+# ==============================================================================
+
+def run_benders_lbbd(filepath, timelimit):
+    # ATTENTION : Remplace "utils.parse_instance" par ta fonction exacte de parsing
+    if hasattr(utils, 'parse_instance'):
+        data = utils.parse_instance(filepath) 
+    else:
+        # Fallback au cas où le nom de ta fonction serait différent
+        data = parse_instance(filepath)
+    
+    benders_cuts = [] # \Omega : Set of Benders cuts
     iteration = 1
 
     total_start_time = time.time()
@@ -301,12 +310,13 @@ def run_benders_lbbd(filepath, timelimit):
         
         if not msol:
             print(" -> [STOP] Le Maître n'a plus aucune solution possible ou Timeout atteint.")
-            return False, "N/A", (time.time() - total_start_time), iteration
+            return False, "N/A", None, None
             
         print(f" -> Le Maître propose un Makespan de {makespan} h.")
         
         start_s = time.time()
-        is_feasible, conflict_tasks, error_time = solve_subproblem(data, schedule)
+        # Récupération des assignments depuis le sous-problème
+        is_feasible, conflict_tasks, error_time, assignments = solve_subproblem(data, schedule)
         t_sub += (time.time() - start_s)
         
         current_runtime = time.time() - total_start_time
@@ -314,7 +324,7 @@ def run_benders_lbbd(filepath, timelimit):
 
         if current_runtime > timelimit:
             print(" -> [TIMEOUT] Temps limite global atteint pour LBBD.")
-            return False, "N/A", current_runtime, iteration
+            return False, "N/A", None, None
 
         if is_feasible:
             print("\n" + "*"*60)
@@ -324,21 +334,32 @@ def run_benders_lbbd(filepath, timelimit):
 
             with open("solution.json", "w") as f:
                 json.dump(schedule, f)
-            return True, makespan, current_runtime, iteration 
+                
+            return True, makespan, schedule, assignments 
         else:
             print(f" -> [REJET] Conflit d'affectation détecté t = {error_time}.")
             print(f" -> Tâches impliquées générant la coupe : {conflict_tasks}")
-            benders_cuts.append(conflict_tasks) 
+            benders_cuts.append(conflict_tasks) # Add cut S to Omega
             print(" -> Redémarrage de la boucle...")
             
         iteration += 1
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python main.py <chemin_vers_instance> <timelimit>")
+        print("Usage: python benders.py <chemin_vers_instance> <timelimit>")
         sys.exit(1)
         
     filepath = sys.argv[1]
     timelimit = int(sys.argv[2])
     
-    run_benders_lbbd(filepath, timelimit)
+    success, makespan, schedule, assignments = run_benders_lbbd(filepath, timelimit)
+    
+    if success:
+        # Récupérer les données pour le tracé
+        if hasattr(utils, 'parse_instance'):
+            data = utils.parse_instance(filepath)
+        else:
+            data = parse_instance(filepath)
+            
+        # Appel de la nouvelle fonction de Gantt
+        plot_gantt_lbbd(data, schedule, assignments, makespan)

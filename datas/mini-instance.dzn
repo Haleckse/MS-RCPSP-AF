@@ -1,0 +1,48 @@
+% seed = 6062145
+
+mint = 32;
+% maxt = 102;
+
+nActs = 7;
+% Durées : T1 et T7 à 0 (Source/Puits)
+dur = [0, 3, 7, 8, 3, 2, 0];
+
+nSkills = 4;
+% sreq : Demande [S1, S2, S3, S4]
+% Aucune tâche ne demande plus de 2 travailleurs au total.
+sreq = [| 0,0,0,0,  % T1 (Source)
+	| 1,0,0,1,  % T2 demande 1xS1 et 1xS2 (Total : 2)
+	| 0,0,1,0,  % T3 demande 1xS3        (Total : 1)
+	| 1,1,0,0,  % T4 demande 1xS4        (Total : 1)
+	| 1,1,0,0,  % T5 demande 1xS2 et 1xS3 (Total : 2)
+	| 0,0,0,1,  % T6 demande 1xS1 et 1xS4 (Total : 2)
+	| 0,0,0,0, |]; % T7 (Puits)
+
+nResources = 3;
+% mastery : Compétences [S1, S2, S3, S4] pour chaque Worker
+% W1 maîtrise S1 et S2
+% W2 maîtrise S3 et S4
+% W3 (l'expert) maîtrise S1, S2, S3 et S4
+mastery = [| true,true,false,false,
+	| true,false,false,false,
+	| false,true,true,true, |];
+
+nPrecs = 8;
+pred = [1, 1, 1, 2, 3, 4, 5, 6];
+succ = [2, 3, 4, 5, 6, 7, 7, 7];
+
+nUnrels = 8;
+unpred = [2, 2, 2, 3, 3, 4, 4, 5];
+unsucc = [3, 4, 6, 4, 5, 5, 6, 6];
+
+USEFUL_RES = [{},
+	{1,2,3},
+	{1,2,3},
+	{1,2,3},
+	{1,2,3},
+	{1,2,3},
+	{}];
+
+POTENTIAL_ACT = [{2,3,4,5,6},
+	{2,3,4,5,6},
+	{2,3,4,5,6}];

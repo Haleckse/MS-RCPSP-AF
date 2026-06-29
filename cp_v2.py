@@ -67,19 +67,18 @@ def solve_cp(filename, timelimit, display_gantt=False):
                         SW[(w, i, v)] = 0
 
     # ==========================================
-    # CONSTRAINTS
+    # CONTRAINTES
     # ==========================================
 
     for i in range(nb_tasks):
         if durations_tasks[i] > 0:  
-            # 1. Structure globale de l'activité (Span)
             mdl.add(mdl.span(act[i], [par[i][v] for v in V[i]]))
             
-            # 2. Contiguïté temporelle stricte
+            # pas de préemption 
             for v in range(len(V[i])-1):
                 mdl.add(mdl.start_at_end(par[i][v+1], par[i][v]))
 
-    # 3. Disjonction temporelle des travailleurs
+    # disjonction temporelle des travailleurs
     for w in range(nb_worker):
         worker_vars = [AW[(w, i, v)] for i in range(nb_tasks) for v in V[i] if (w, i, v) in AW]
         if worker_vars:
@@ -91,17 +90,16 @@ def solve_cp(filename, timelimit, display_gantt=False):
                 
                 valid_AW_for_part = [AW[(w, i, v)] for w in range(nb_worker) if (w, i, v) in AW]
                 
-                # 4. Allocation capacitaire globale (Alternative)
+                # allocation capacitaire globale (Alternative)
                 if valid_AW_for_part:
                     mdl.add(mdl.alternative(par[i][v], valid_AW_for_part, number_of_worker[i]))
                 
                 for w in range(nb_worker):
                     if (w, i, v) in AW:
-                        # 5. Canalisation (Channeling)
                         mdl.add(mdl.presence_of(AW[(w, i, v)]) == (SW[(w, i, v)] > 0))
 
                 # =======================================================
-                # 6. Couverture exacte des compétences (Distribute / GCC)
+                # DISTRIBUTE
                 # =======================================================
                 vars_SW = [SW[(w, i, v)] for w in range(nb_worker)]
                 
@@ -115,34 +113,10 @@ def solve_cp(filename, timelimit, display_gantt=False):
                         cards.append(int(req))
                         values.append(int(l + 1))
                 
-                # /!\ L'ordre en Python est : distribute(cards, exprs, values)
+                # distribute(cards, exprs, values)
                 mdl.add(mdl.distribute(cards, vars_SW, values))
 
-   # ==========================================
-    # 7. Brisure de symétries (Contrainte stricte du tuteur)
-    # ==========================================
-    for i in range(nb_tasks):
-        if durations_tasks[i] > 0:
-            for v in range(1, len(V[i])): # Uniquement pour v > 0 (donc à partir de la sous-partie 2)
-                
-                # On compte combien d'AUTRES activités (j != i) démarrent exactement 
-                # en même temps que la sous-partie v de l'activité i.
-                autres_demarrages = []
-                for j in range(nb_tasks):
-                    if j != i and durations_tasks[j] > 0:
-                        autres_demarrages.append(mdl.start_of(act[j]) == mdl.start_of(par[i][v]))
-                
-                # Condition booléenne : "aucune autre activité ne démarre" (la somme est 0)
-                condition_statique = (mdl.sum(autres_demarrages) == 0)
-                
-                # Application de la contrainte d'égalité pour tous les travailleurs
-                for w in range(nb_worker):
-                    # On s'assure que les variables existent pour cette tâche
-                    if (w, i, v) in SW and (w, i, v-1) in SW:
-                        # On s'assure que ce ne sont pas de simples entiers figés à 0
-                        if type(SW[(w, i, v)]) != int and type(SW[(w, i, v-1)]) != int:
-                            # Si la condition est respectée, l'état précédent est conservé
-                            mdl.add(mdl.if_then(condition_statique, SW[(w, i, v)] == SW[(w, i, v-1)]))
+  
 
     # 8. Contraintes de précédence
     for i in range(nb_tasks):
