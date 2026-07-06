@@ -2,8 +2,8 @@ import os
 import sys
 import pandas as pd
 
-from cp_v2 import solve_cp  
-from benders import run_benders_lbbd  
+from cp_model_carla import solve_cp
+from benders import run_benders_lbbd
 from checker import verify_solution
 from utils import parse_instance
 import json
@@ -18,27 +18,27 @@ def run_all_benchmarks(method, instances_folder, timelimit):
         return
 
     files = [f for f in os.listdir(instances_folder) if f.endswith('.dzn')]
-    files.sort() 
+    files.sort()
 
-    results = [] 
+    results = []
 
     for inst_num, filename in enumerate(files):
         print(f"\n[{inst_num + 1}/{len(files)}] Traitement de l'instance : {filename}...")
         filepath = os.path.join(instances_folder, filename)
-        
+
         # Initialisation de la ligne de résultat
         row_data = {
             "instNum": inst_num + 1,
             "Instance": filename
         }
 
-        # ===============        
+        # ===============
         # EXÉCUTION CP
         # ===============
         if method in ['cp', 'both']:
             print(" -> Lancement CP Classique...")
-            # msol, InTech = solve_cp(filepath, timelimit, display_gantt=False)
-            msol, AW, SW = solve_cp(filepath, timelimit, display_gantt=False)
+            msol, InTech = solve_cp(filepath, timelimit, display_gantt=False)
+            #msol, AW, SW = solve_cp(filepath, timelimit, display_gantt=False)
             if msol:
                 makespan = msol.get_objective_values()[0]
                 lb = msol.get_objective_bounds()[0]
@@ -56,7 +56,7 @@ def run_all_benchmarks(method, instances_folder, timelimit):
                 print(f"    [CP] Makespan: {makespan} | Gap: {round(gap*100,2)}% | Temps: {round(runtime,2)}s")
             else:
                 row_data.update({
-                    "CP_Optimal": 0, "CP_LB": "N/A", "CP_Makespan": "N/A", 
+                    "CP_Optimal": 0, "CP_LB": "N/A", "CP_Makespan": "N/A",
                     "CP_Gap (%)": "N/A", "CP_Runtime (s)": timelimit
                 })
                 print("    [CP] Aucun planning trouvé (Timeout).")
@@ -67,7 +67,7 @@ def run_all_benchmarks(method, instances_folder, timelimit):
         if method in ['benders', 'both']:
             print(" -> Lancement LBBD...")
             bd_success, bd_makespan, bd_runtime, bd_iters = run_benders_lbbd(filepath, timelimit)
-            
+
             if bd_success:
                 row_data.update({
                     "BD_Optimal": 1, # Benders s'arrête uniquement quand il a prouvé l'optimalité
@@ -87,8 +87,8 @@ def run_all_benchmarks(method, instances_folder, timelimit):
 
             else:
                 row_data.update({
-                    "BD_Optimal": 0, "BD_Makespan": "N/A", 
-                    "BD_Iters": bd_iters if bd_iters else "N/A", 
+                    "BD_Optimal": 0, "BD_Makespan": "N/A",
+                    "BD_Iters": bd_iters if bd_iters else "N/A",
                     "BD_Runtime (s)": timelimit
                 })
                 print("    [BD] Aucun planning prouvé optimal trouvé (Timeout).")
@@ -99,7 +99,7 @@ def run_all_benchmarks(method, instances_folder, timelimit):
     # EXPORTATION DES RÉSULTATS
     # ---------------------------------------------------------
     df = pd.DataFrame(results)
-    
+
     print("\n" + "="*80)
     print("                 RÉSUMÉ DES BENCHMARKS")
     print("="*80)
