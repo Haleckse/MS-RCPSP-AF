@@ -1,84 +1,80 @@
+import networkx as nx
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
-def plot_relais_specialistes():
-    # --- CONFIGURATION DES COULEURS ---
-    # Worker 1 (Possède S1, S2) : Bleu
-    # Worker 2 (Possède S1, S3) : Rouge
-    colors = {1: '#1f77b4', 2: '#d62728'}
+# 1. Création du graphe orienté
+G = nx.DiGraph()
+
+# 2. Ajout des arêtes avec leurs capacités
+# (S -> Ouvriers) : Capacité = 1 (1 personne physique)
+G.add_edge('S', 'Ouvrier 1', capacity=1)
+G.add_edge('S', 'Ouvrier 2', capacity=1)
+G.add_edge('S', 'Ouvrier 3', capacity=1)
+
+# (Ouvriers -> Tâches) : Compétences (Capacité infinie)
+INF = float('inf')
+G.add_edge('Ouvrier 1', 'Tâche A', capacity=INF)
+G.add_edge('Ouvrier 2', 'Tâche B', capacity=INF)
+G.add_edge('Ouvrier 3', 'Tâche C', capacity=INF)
+
+# (Tâches -> Puits) : Demande (Besoins)
+G.add_edge('Tâche A', 'P', capacity=0) # Pas besoin de la tâche A
+G.add_edge('Tâche B', 'P', capacity=2) # Besoin de 2 personnes
+G.add_edge('Tâche C', 'P', capacity=1) # Besoin de 1 personne
+
+# 3. Calcul du Flot Max et de la Coupe Min
+cut_value, partition = nx.minimum_cut(G, 'S', 'P')
+reachable, non_reachable = partition
+
+print(f"--- RÉSULTATS DU CALCUL ---")
+print(f"Valeur de la coupe minimale (Flot Max) : {cut_value}")
+print(f"Noeuds côté Source (accessibles) : {reachable}")
+print(f"Noeuds côté Puits (isolés, en déficit) : {non_reachable}")
+
+# 4. Identification de l'arête spécifique qui forme la coupe
+# Une arête (u, v) est dans la coupe si u est côté Source et v est côté Puits
+cut_edges = []
+for u, v in G.edges():
+    if u in reachable and v in non_reachable:
+        cut_edges.append((u, v))
+
+print(f"Arête(s) saturée(s) formant la coupe : {cut_edges}")
+
+# ==========================================
+# 5. VISUALISATION DU GRAPHE
+# ==========================================
+
+# Définition des positions manuellement pour un bel affichage de gauche à droite
+pos = {
+    'S': (0, 1),
+    'Ouvrier 1': (1, 2), 'Ouvrier 2': (1, 1), 'Ouvrier 3': (1, 0),
+    'Tâche A': (2, 2), 'Tâche B': (2, 1), 'Tâche C': (2, 0),
+    'P': (3, 1)
+}
+
+plt.figure(figsize=(10, 6))
+
+# Dessin des noeuds
+nx.draw_networkx_nodes(G, pos, node_size=2500, node_color='lightblue', edgecolors='black')
+nx.draw_networkx_labels(G, pos, font_size=10, font_weight="bold")
+
+# Séparation des arêtes normales et des arêtes coupées
+normal_edges = [e for e in G.edges() if e not in cut_edges]
+
+# Dessin des arêtes normales (en gris)
+nx.draw_networkx_edges(G, pos, edgelist=normal_edges, arrows=True, arrowsize=20, edge_color='gray')
+
+# Dessin de la COUPE MINIMALE (en rouge épais)
+nx.draw_networkx_edges(G, pos, edgelist=cut_edges, arrows=True, arrowsize=20, edge_color='red', width=3.0)
+
+# Ajout des étiquettes de capacité sur les flèches
+edge_labels = {}
+for u, v, data in G.edges(data=True):
+    cap = data['capacity']
+    edge_labels[(u, v)] = 'inf' if cap == INF else str(cap)
     
-    # --- DONNÉES DU SCÉNARIO 1 : SANS FLEXIBILITÉ (AF) ---
-    # Format : 'Nom de Tâche': [(début, durée, id_worker, compétence)]
-    scenario_1 = {
-        'Tâche C (Besoin S3)': [(5, 5, 2, 'S3')],   # W2 bloqué sur C de 5h à 10h
-        'Tâche B (Besoin S2)': [(0, 5, 1, 'S2')],   # W1 bloqué sur B de 0h à 5h
-        'Tâche A (Besoin S1)': [(5, 10, 1, 'S1')],  # W1 fait A d'une traite de 5h à 15h
-    }
-    makespan_1 = 15
+nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red', font_size=10)
 
-    # --- DONNÉES DU SCÉNARIO 2 : AVEC FLEXIBILITÉ (AF) ---
-    scenario_2 = {
-        'Tâche C (Besoin S3)': [(5, 5, 2, 'S3')],   # W2 bascule sur C à 5h
-        'Tâche B (Besoin S2)': [(0, 5, 1, 'S2')],   # W1 fait B de 0h à 5h
-        'Tâche A (Besoin S1)': [(0, 5, 2, 'S1'),    # W2 commence A (0h à 5h)
-                                (5, 5, 1, 'S1')],   # W1 prend le relais (5h à 10h)
-    }
-    makespan_2 = 10
-
-    # --- CRÉATION DE LA FIGURE ---
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
-    fig.suptitle("Démonstration : L'impact de la Flexibilité d'Allocation (AF)", fontsize=16, fontweight='bold')
-
-    def draw_gantt(ax, title, data, makespan):
-        y_ticks = []
-        y_labels = []
-        
-        for i, (task_name, blocks) in enumerate(data.items()):
-            y_ticks.append(i)
-            y_labels.append(task_name)
-            
-            # Tracé de l'enveloppe globale grise (pour bien voir la durée de la tâche)
-            task_start = min([b[0] for b in blocks])
-            task_total_dur = sum([b[1] for b in blocks])
-            ax.barh(y=i, width=task_total_dur, left=task_start, 
-                    color='#eaeaea', edgecolor='gray', alpha=0.4, height=0.6)
-            
-            # Tracé des blocs d'affectation
-            for (start, dur, w_id, skill) in blocks:
-                ax.barh(y=i, width=dur, left=start, height=0.5, 
-                        color=colors[w_id], edgecolor='white', linewidth=1.5)
-                
-                # Texte au centre du bloc
-                ax.text(start + dur/2, i, f"W{w_id} ({skill})", 
-                        va='center', ha='center', color='white', fontsize=10, fontweight='bold')
-
-        ax.set_title(f"{title}\nMakespan = {makespan} heures", fontsize=12, fontweight='bold', pad=15)
-        ax.set_xlabel("Temps (Heures)", fontsize=10, fontweight='bold')
-        ax.set_yticks(y_ticks)
-        ax.set_yticklabels(y_labels, fontsize=10, fontweight='bold')
-        ax.set_xlim(0, 16)
-        ax.set_xticks(range(0, 17))
-        ax.grid(axis='x', linestyle='--', alpha=0.5)
-        ax.set_axisbelow(True)
-
-    # --- DESSIN DES DEUX SOUS-GRAPHIQUES ---
-    draw_gantt(ax1, "SCÉNARIO 1 : Sans Flexibilité (Un worker doit terminer ce qu'il commence)", scenario_1, makespan_1)
-    draw_gantt(ax2, "SCÉNARIO 2 : Avec Flexibilité (Passage de relais autorisé)", scenario_2, makespan_2)
-
-    # --- LÉGENDE GLOBALE ---
-    legend_patches = [
-        mpatches.Patch(color=colors[1], label="Worker 1 {S1, S2}"),
-        mpatches.Patch(color=colors[2], label="Worker 2 {S1, S3}")
-    ]
-    fig.legend(handles=legend_patches, loc='upper right', bbox_to_anchor=(0.95, 0.95), 
-               title="Compétences de l'Équipe", fontsize=10, title_fontsize=11)
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96]) # Ajustement pour le titre global
-    
-    # Sauvegarde et affichage
-    plt.savefig("demonstration_af_relais.png", dpi=300)
-    print("Le graphique a été généré et sauvegardé sous 'demonstration_af_relais.png'.")
-    plt.show()
-
-if __name__ == "__main__":
-    plot_relais_specialistes()
+plt.title("Réseau de Flot - Détection du goulot de compétence (Ligne Rouge)", fontsize=14)
+plt.axis('off')
+plt.tight_layout()
+plt.show()

@@ -83,7 +83,7 @@ def parse_instance(file_path):
 
 
 
-def plot_gantt_lbbd(data, schedule, assignments, makespan):
+def plot_gantt(data, schedule, assignments, makespan):
     """
     Génère et affiche le diagramme de Gantt à partir des dictionnaires LBBD (avec Skills).
     """
