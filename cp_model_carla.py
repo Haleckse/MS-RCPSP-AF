@@ -7,12 +7,13 @@ from docplex.cp.model import CpoModel
 import sys
 
 from utils import parse_instance
+from utils import plot_gantt
 
 def solve_cp(filename, timelimit, display_gantt=False):
 
     data = parse_instance(filename)
 
-    # SETS
+    # SETS 
     nb_tasks = data['nActs']          # |A| : Nombre d'activités (i)
     nb_skills = data['nSkills']       # |L| : Nombre de compétences (l)
     nb_worker = data['nResources']    # |W| : Nombre de MS resources / workers (w)
@@ -22,7 +23,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
     durations_tasks = data['dur']               # p_i : Durée de l'activité i
     skills_requirement = data['sreq']           # a_{i,l} : Demande en compétence l pour l'activité i
     skills_per_worker = data['mastery']         # m_{w,l} : Matrice de maîtrise (1 si w a la comp. l, 0 sinon)
-
+    
     _pred = data['pred']
     _succ = data['succ']
     successors = [[] for _ in range(nb_tasks)]  # E : Contraintes de précédences
@@ -31,28 +32,28 @@ def solve_cp(filename, timelimit, display_gantt=False):
 
     ressource_capa = []                         # B_k : Capacité de la ressource cumulative k
     ressource_requirement = [[0] * nb_ressource for _ in range(nb_tasks)] # b_{i,k} : Demande en ressource k
-
+    
     number_of_worker = [sum(row) for row in skills_requirement] # q_i : Quota minimum total de workers pour i
 
     # N_l : Capacité statique par compétence (Total number of workers mastering skill l)
     skill_resource = [sum(skills_per_worker[w][l] for w in range(nb_worker)) for l in range(nb_skills)]
 
-    # V_i : Set of unit-duration parts
+    # V_i : Set of unit-duration parts 
     V = {i : [j for j in range(durations_tasks[i])] for i in range(nb_tasks)}
 
     mdl = CpoModel()
 
-    # DECISION VARIABLES
+    # DECISION VARIABLES 
 
     # act_i : Variable d'intervalle représentant les taches
     act = [mdl.interval_var(name=f"act{i}", size=durations_tasks[i]) for i in range(nb_tasks)]
 
-    # par_{i,v}
+    # par_{i,v} 
     par = [[mdl.interval_var(name=f"par{i}_{v}", size=1) for v in V[i]] for i in range(nb_tasks)]
 
-    # awo_{w,i,l,v}
+    # awo_{w,i,l,v} 
     awo = {}
-    for w in range(nb_worker):
+    for w in range(nb_worker): 
         for i in range(nb_tasks):
             if durations_tasks[i] > 0:
                 for l in range(nb_skills):
@@ -61,32 +62,16 @@ def solve_cp(filename, timelimit, display_gantt=False):
                             awo[(w, i, l, v)] = mdl.interval_var(name=f"awo_{w}_{i}_{l}_{v}", optional=True)
 
 
-    # CONSTRAINTS
+    # CONSTRAINTS 
 
     for i in range(nb_tasks):
-        if durations_tasks[i] > 0:
+        if durations_tasks[i] > 0:  
             # Activity Components Span : span(act_i, {par_{i,v}})
             mdl.add(mdl.span(act[i], [par[i][v] for v in V[i]]))
-
+            
             # Strict Temporal Contiguity : startAtEnd(par_{i,v+1}, par_{i,v})
             for v in range(len(V[i])-1):
                 mdl.add(mdl.start_at_end(par[i][v+1], par[i][v]))
-
-    # Symmetry breaking constraints (Carla's proposal)
-    for i in range(nb_tasks):
-        if durations_tasks[i] > 1:
-            for v in range(1, len(V[i])):
-                no_task_starts = mdl.all([
-                    mdl.start_of(par[i][v]) != mdl.start_of(act[j])
-                    for j in range(nb_tasks) if durations_tasks[j] > 0
-                ])
-                for w in range(nb_worker):
-                    for l in range(nb_skills):
-                        if (w, i, l, v) in awo and (w, i, l, v - 1) in awo:
-                            mdl.add(mdl.if_then(
-                                no_task_starts,
-                                mdl.presence_of(awo[(w, i, l, v)]) == mdl.presence_of(awo[(w, i, l, v - 1)])
-                            ))
 
     # Cumulative Material Resource Capacity : sum(pulse(act_i, b_{i,k})) <= B_k
     for k in range(nb_ressource):
@@ -109,11 +94,41 @@ def solve_cp(filename, timelimit, display_gantt=False):
                     if skills_requirement[i][l] > 0:
                         valid_workers = [awo[(w, i, l, v)] for w in range(nb_worker) if (w, i, l, v) in awo]
                         mdl.add(mdl.alternative(par[i][v], valid_workers, skills_requirement[i][l]))
-
+                
                 # Workforce Headcount Quota Coverage : alternative(par_{i,v}, {awo_all}, q_i)
                 req_total = number_of_worker[i]
                 all_valid_workers = [awo[(w, i, l, v)] for w in range(nb_worker) for l in range(nb_skills) if (w, i, l, v) in awo]
                 mdl.add(mdl.alternative(par[i][v], all_valid_workers, req_total))
+
+
+
+    for i in range(nb_tasks):
+        if durations_tasks[i] > 1: 
+            for v in range(1, len(V[i])): # v in V_i \ {0}
+                
+                # At least one task j starts at the exact same time as par_{i,v}
+                # Check if any task's start time matches the current unit-duration part's start time           
+                any_task_starts = mdl.sum([
+                    mdl.start_of(act[j]) == mdl.start_of(par[i][v]) 
+                    for j in range(nb_tasks) if durations_tasks[j] > 0
+                ]) >= 1
+                
+                # If no task starts at this moment, the worker allocation remains identical to step v-1
+                for l in range(nb_skills):
+                    if skills_requirement[i][l] > 0:
+                        for w in range(nb_worker):
+                            key_curr = (w, i, l, v)
+                            key_prev = (w, i, l, v-1)
+                            
+                            # Verify that keys exist in the awo dictionary
+                            if key_curr in awo and key_prev in awo:
+                                # presence_of évalue si la variable d'intervalle optionnelle est "réalisée" (valeur 1) ou non (valeur 0)
+                                mdl.add(
+                                    mdl.if_then(
+                                        any_task_starts == 0,
+                                        mdl.presence_of(awo[key_curr]) == mdl.presence_of(awo[key_prev])
+                                    )
+                                )
 
 
     # Redundant Global Capacity Envelopes (wU <= |W| and sU_l <= N_l)
@@ -131,7 +146,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
         for succ in successors[i]:
             mdl.add(mdl.end_before_start(act[i], act[succ]))
 
-    # OBJECTIVE FUNCTION
+    # OBJECTIVE FUNCTION 
     # Makespan Lower Bound & Minimize C_max
     obj1 = mdl.max([mdl.end_of(t) for t in act])
     mdl.add(mdl.minimize(obj1))
@@ -139,9 +154,9 @@ def solve_cp(filename, timelimit, display_gantt=False):
     msol = mdl.solve(TimeLimit=timelimit, LogVerbosity='Quiet')
 
     if msol:
-        if display_gantt:
+        if display_gantt: 
             plot_gantt(msol, nb_tasks, nb_worker, nb_skills, durations_tasks, V, act, par, awo)
     else:
         print("No solution found.")
-
+        
     return (msol, awo)

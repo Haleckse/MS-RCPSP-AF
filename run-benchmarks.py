@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 
-from cp_model_carla import solve_cp
+from cp import solve_cp
 from benders import run_benders_lbbd
 from checker import verify_solution
 from utils import parse_instance
