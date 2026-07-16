@@ -129,6 +129,19 @@ def solve_cp(filename, timelimit, display_gantt=False):
         if ressources:
             mdl.add(mdl.sum(ressources) <= int(ressource_capa[k]))
 
+    # Enveloppes cumulatives redondantes (Global Capacity Envelopes)
+    # 9.1 Enveloppe de capacité physique globale (headcount)
+    total_workers_usage = [mdl.pulse(act[i], number_of_worker[i]) for i in range(nb_tasks) if durations_tasks[i] > 0]
+    if total_workers_usage:
+        mdl.add(mdl.sum(total_workers_usage) <= nb_worker)
+
+    # 9.2 Enveloppe de capacité par compétence
+    skill_capacity = [sum(skills_per_worker[w][l] for w in range(nb_worker)) for l in range(nb_skills)]
+    for l in range(nb_skills):
+        skill_usage = [mdl.pulse(act[i], skills_requirement[i][l]) for i in range(nb_tasks) if skills_requirement[i][l] > 0]
+        if skill_usage:
+            mdl.add(mdl.sum(skill_usage) <= skill_capacity[l])
+
     # ==========================================
     # OBJECTIVE FUNCTION
     # ==========================================
