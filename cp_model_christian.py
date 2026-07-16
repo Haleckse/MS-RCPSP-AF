@@ -142,6 +142,27 @@ def solve_cp(filename, timelimit, display_gantt=False):
         if skill_usage:
             mdl.add(mdl.sum(skill_usage) <= skill_capacity[l])
 
+    # 10. Bris de symétrie (non-rotation conditionnelle)
+    for i in range(nb_tasks):
+        if durations_tasks[i] > 1: 
+            for v in range(1, len(V[i])): # v in V_i \ {0}
+                # Au moins une tâche j débute au même instant que par_{i,v}
+                any_task_starts = mdl.sum([
+                    mdl.start_of(act[j]) == mdl.start_of(par[i][v]) 
+                    for j in range(nb_tasks) if durations_tasks[j] > 0
+                ]) >= 1
+                
+                # Si aucune tâche ne débute à cet instant, l'affectation du worker reste identique
+                for w in range(nb_worker):
+                    if (w, i, v) in AW:
+                        mdl.add(
+                            mdl.if_then(
+                                any_task_starts == 0,
+                                SW[(w, i, v)] == SW[(w, i, v-1)]
+                            )
+                        )
+
+
     # ==========================================
     # OBJECTIVE FUNCTION
     # ==========================================
