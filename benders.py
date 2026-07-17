@@ -17,42 +17,42 @@ context.solver.agent = 'local'
 context.solver.local.execfile = '/home/atsan/cplex/cpoptimizer/bin/x86-64_linux/cpoptimizer'
 
 
-# MASTER PROBLEM (SCHEDULING) 
+# PROBLÈME MAÎTRE (ORDONNANCEMENT) 
 
 def solve_master_problem(data, timelimit, benders_cuts=None):
     """
     Ne gère que le temps et les capacités globales (Relaxed CP model).
     """
-    # SETS 
-    nb_tasks = data['nActs']          # |A| : Set of activities (i)
-    nb_skills = data['nSkills']       # |L| : Set of skills (l)
-    nb_worker = data['nResources']    # |W| : Set of MS resources (w)
-    nb_ressource = data.get('nb_ressource', 0) # |CR| : Set of cumulative resources (k)
+    # ENSEMBLES 
+    nb_tasks = data['nActs']          # |A| : Ensemble des activités (i)
+    nb_skills = data['nSkills']       # |L| : Ensemble des compétences (l)
+    nb_worker = data['nResources']    # |W| : Ensemble des travailleurs multi-compétences (w)
+    nb_ressource = data.get('nb_ressource', 0) # |CR| : Ensemble des ressources cumulatives matérielles (k)
     
-    # PARAMETERS 
-    durations_tasks = data['dur']     # p_i : Processing time of activity i
+    # PARAMÈTRES 
+    durations_tasks = data['dur']     # p_i : Durée de traitement de l'activité i
     horizon = sum(durations_tasks) + 10  
-    skills_requirement = data['sreq'] # a_{i,l} : Number of workers mastering skill l required for act i
-    skills_per_worker = data['mastery'] # m_{w,l} : 1 if worker w masters skill l
+    skills_requirement = data['sreq'] # a_{i,l} : Nombre de travailleurs maîtrisant la compétence l requis pour l'activité i
+    skills_per_worker = data['mastery'] # m_{w,l} : 1 si le travailleur w maîtrise la compétence l, 0 sinon
     ressource_requirement = data.get('ressource_requirement', [[0]*nb_ressource for _ in range(nb_tasks)]) # b_{i,k}
     ressource_capa = data.get('ressource_capa', []) # B_k
     
-    number_of_worker = [sum(row) for row in skills_requirement] # q_i : Minimum total number of workers for act i
+    number_of_worker = [sum(row) for row in skills_requirement] # q_i : Quota minimum total de travailleurs requis pour l'activité i
 
-    successors = [[] for _ in range(nb_tasks)] # E : Precedence constraints
+    successors = [[] for _ in range(nb_tasks)] # E : Contraintes de précédence
     for p, s in zip(data['pred'], data['succ']):
         successors[p - 1].append(s - 1)
 
-    # N_l : Total number of workers mastering skill l
+    # N_l : Nombre total de travailleurs maîtrisant la compétence l
     skill_resource = [sum(skills_per_worker[w][l] for w in range(nb_worker)) for l in range(nb_skills)]
     
-    # MODEL
+    # MODÈLE
 
     mdl = CpoModel()
 
-    # DECISION VARIABLES
+    # VARIABLES DE DÉCISION
 
-    # act_i : Interval variable for the global execution of activity i
+    # act_i : Variable d'intervalle pour l'exécution globale de l'activité i
     act = [mdl.interval_var(size=durations_tasks[i], name=f"act{i}") for i in range(nb_tasks)]
 
     # endBeforeStart(act_i, act_m) for (i,m) in E
@@ -83,17 +83,17 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
     # C_max >= act_i.end AND min C_max
     obj = mdl.max([mdl.end_of(t) for t in act])
 
-    # ADDING BENDERS CUT
+    # AJOUT DES COUPES DE BENDERS
     if benders_cuts:
         for cut_idx, cut_info in enumerate(benders_cuts):
             
-            A_S = cut_info['A_S']                  # {A}_S : minimal conflicting subset of tasks
-            S = cut_info['S']                      # S     : corresponding set of saturated skills
-            WS_capacity = cut_info['WS_capacity']  # |W_S| : capacity of the qualified workforce
+            A_S = cut_info['A_S']                  # {A}_S : sous-ensemble minimal de tâches en conflit
+            S = cut_info['S']                      # S     : ensemble correspondant de compétences saturées
+            WS_capacity = cut_info['WS_capacity']  # |W_S| : capacité de la main-d'œuvre qualifiée
             
             conflict_pulses = []
             
-            # for i in A_S:
+            # pour chaque tâche i :
             for i in range(nb_tasks):
 
                 if durations_tasks[i] > 0:
@@ -126,7 +126,7 @@ def solve_master_problem(data, timelimit, benders_cuts=None):
         return None, None, None
 
 
-# SUBPROBLEM (AFFECTATION) 
+# SOUS-PROBLÈME (AFFECTATION) 
 
 def solve_subproblem(data, schedule):
     nb_tasks = data['nActs']
@@ -137,7 +137,7 @@ def solve_subproblem(data, schedule):
 
     max_time = max([max(times) + 1 for times in schedule.values() if times])
     
-    # Subproblem is solved for each time period t independently (Allocation Flexibility)
+    # Le sous-problème est résolu pour chaque période temporelle t de manière indépendante (flexibilité d'affectation)
     for t in range(max_time):
         active_tasks = [i for i in range(nb_tasks) if i in schedule and t in schedule[i]]
         if not active_tasks: continue
@@ -149,7 +149,7 @@ def solve_subproblem(data, schedule):
         total_demand = 0
         node_to_task_skill = {} 
 
-        # Build demand side of the bi-part graph 
+        # Construction du côté demande du graphe bipartite 
         for i in active_tasks:
             for l in range(nb_skills):
                 req = skills_requirement[i][l] 
@@ -160,7 +160,7 @@ def solve_subproblem(data, schedule):
                     node_to_task_skill[node_name] = {'task': i, 'skill': l, 'demand': req}
                     total_demand += req
                     
-        # Build supply side of the bi-part graph
+        # Construction du côté offre du graphe bipartite
         for w in range(nb_worker):
             worker_node = f'Worker_{w}'
             G.add_node(worker_node)
@@ -174,35 +174,35 @@ def solve_subproblem(data, schedule):
                             
         flow_value, _ = nx.maximum_flow(G, 'SOURCE', 'SINK')
         
-        # Subproblem is infeasible if max flow < total demand (D_l)
+        # Le sous-problème est infaisable si le flot max < demande totale (D_l)
         if flow_value < total_demand:
-            # Generate Logic-Based Benders Cut via Min-Cut 
+            # Génération de la coupe de Benders basée sur la logique via Min-Cut 
             cut_value, partition = nx.minimum_cut(G, 'SOURCE', 'SINK')
             reachable, non_reachable = partition 
             
-            # Extract nodes on the Sink side of the cut (where d_{s,l} = 0)
+            # Extraction des nœuds du côté Puits de la coupe (où d_{s,l} = 0)
             P_NR = [n for n in non_reachable if n.startswith('Task_')]
             
-            # {A}_S : Minimal conflicting subset of tasks
+            # {A}_S : Sous-ensemble minimal de tâches en conflit
             A_S = list(set(node_to_task_skill[n]['task'] for n in P_NR))
-            # S : Corresponding set of saturated skills
+            # S : Ensemble correspondant de compétences saturées
             S = list(set(node_to_task_skill[n]['skill'] for n in P_NR))
             
-            # W_S : Subset of workers mastering at least one skill in S
+            # W_S : Sous-ensemble de travailleurs maîtrisant au moins une compétence dans S
             W_S = [w for w in range(nb_worker) if any(skills_per_worker[w][l] == 1 for l in S)]
             
-            # Return the cut informations
+            # Retourner les informations de la coupe
             return False, {'A_S': A_S, 'S': S, 'WS_capacity': len(W_S)}, t
             
     return True, None, None
 
 
-# MAIN LOOP
+# BOUCLE PRINCIPALE
 
 def run_benders_lbbd(filepath, timelimit):
     data = parse_instance(filepath) 
     
-    benders_cuts = [] # \Omega : Set of Benders cuts
+    benders_cuts = [] # \Omega : Ensemble des coupes de Benders
     iteration = 1
 
     total_start_time = time.time()

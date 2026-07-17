@@ -14,13 +14,13 @@ def solve_cp(filename, timelimit, display_gantt=False):
 
     data = parse_instance(filename)
 
-    # SETS 
+    # ENSEMBLES 
     nb_tasks = data['nActs']          # |A|
     nb_skills = data['nSkills']       # |L|
     nb_worker = data['nResources']    # |W|
     nb_ressource = 0                  # |CR| 
 
-    # PARAMETERS
+    # PARAMÈTRES
     durations_tasks = data['dur']               
     skills_requirement = data['sreq']           
     skills_per_worker = data['mastery']         
@@ -36,20 +36,20 @@ def solve_cp(filename, timelimit, display_gantt=False):
     
     number_of_worker = [sum(row) for row in skills_requirement] # q_i
 
-    # V_i : Set of unit-duration parts 
+    # V_i : Ensemble des parties de durée unitaire
     V = {i : [j for j in range(durations_tasks[i])] for i in range(nb_tasks)}
 
     mdl = CpoModel()
 
     # ==========================================
-    # DECISION VARIABLES
+    # VARIABLES DE DÉCISION
     # ==========================================
 
     act = [mdl.interval_var(name=f"act_{i}", size=durations_tasks[i]) for i in range(nb_tasks)]
     par = [[mdl.interval_var(name=f"par_{i}_{v}", size=1) for v in V[i]] for i in range(nb_tasks)]
 
-    AW = {} # Est ce que w est sur v de i ? 
-    SW = {} # Donne le skill que w utilise pour faire v de i
+    AW = {} # Détermine si le travailleur w est présent sur la partie v de la tâche i
+    SW = {} # Donne la compétence l que le travailleur w utilise pour faire la partie v de la tâche i
 
     for i in range(nb_tasks):
         if durations_tasks[i] > 0:
@@ -74,11 +74,11 @@ def solve_cp(filename, timelimit, display_gantt=False):
         if durations_tasks[i] > 0:  
             mdl.add(mdl.span(act[i], [par[i][v] for v in V[i]]))
             
-            # pas de préemption 
+            # Pas de préemption
             for v in range(len(V[i])-1):
                 mdl.add(mdl.start_at_end(par[i][v+1], par[i][v]))
 
-    # disjonction temporelle des travailleurs
+    # Disjonction temporelle des travailleurs (pas de chevauchement)
     for w in range(nb_worker):
         worker_vars = [AW[(w, i, v)] for i in range(nb_tasks) for v in V[i] if (w, i, v) in AW]
         if worker_vars:
@@ -90,7 +90,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
                 
                 valid_AW_for_part = [AW[(w, i, v)] for w in range(nb_worker) if (w, i, v) in AW]
                 
-                # allocation capacitaire globale (Alternative)
+                # Allocation capacitaire globale (Alternative)
                 if valid_AW_for_part:
                     mdl.add(mdl.alternative(par[i][v], valid_AW_for_part, number_of_worker[i]))
                 
@@ -99,7 +99,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
                         mdl.add(mdl.presence_of(AW[(w, i, v)]) == (SW[(w, i, v)] > 0))
 
                 # =======================================================
-                # DISTRIBUTE
+                # CONTRAINTE DISTRIBUTE
                 # =======================================================
                 vars_SW = [SW[(w, i, v)] for w in range(nb_worker)]
                 
@@ -118,7 +118,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
 
   
 
-    # 8. Contraintes de précédence
+    # 8. Relations de précédence
     for i in range(nb_tasks):
         for succ in successors[i]:
             mdl.add(mdl.end_before_start(act[i], act[succ]))
@@ -130,7 +130,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
             mdl.add(mdl.sum(ressources) <= int(ressource_capa[k]))
 
     # Enveloppes cumulatives redondantes (Global Capacity Envelopes)
-    # 9.1 Enveloppe de capacité physique globale (headcount)
+    # 9.1 Enveloppe de capacité physique globale (nombre de travailleurs)
     total_workers_usage = [mdl.pulse(act[i], number_of_worker[i]) for i in range(nb_tasks) if durations_tasks[i] > 0]
     if total_workers_usage:
         mdl.add(mdl.sum(total_workers_usage) <= nb_worker)
@@ -152,7 +152,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
                     for j in range(nb_tasks) if durations_tasks[j] > 0
                 ]) >= 1
                 
-                # Si aucune tâche ne débute à cet instant, l'affectation du worker reste identique
+                # Si aucune tâche ne débute à cet instant, l'affectation du travailleur reste identique
                 for w in range(nb_worker):
                     if (w, i, v) in AW:
                         mdl.add(
@@ -164,7 +164,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
 
 
     # ==========================================
-    # OBJECTIVE FUNCTION
+    # FONCTION OBJECTIF
     # ==========================================
     
     makespan = mdl.max([mdl.end_of(t) for t in act])
