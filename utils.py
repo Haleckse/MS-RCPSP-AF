@@ -35,8 +35,8 @@ def parse_instance(file_path):
         proj_lines = [l for l in sections.get('Project Module', []) if l.strip()]
         first_line = proj_lines[0].split()
         nActs = int(first_line[0])
-        nSkills = int(first_line[1])
-        nResources = int(first_line[2])
+        nResources = int(first_line[1])
+        nSkills = int(first_line[2])
         
         activity_lines = []
         for l in proj_lines[1:]:

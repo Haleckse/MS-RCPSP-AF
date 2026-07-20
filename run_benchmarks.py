@@ -17,7 +17,7 @@ def run_all_benchmarks(method, instances_folder, timelimit):
         print(f"Erreur : Le dossier {instances_folder} n'existe pas.")
         return
 
-    files = [f for f in os.listdir(instances_folder) if f.endswith('.dzn')]
+    files = [f for f in os.listdir(instances_folder) if f.endswith('.dzn') or f.endswith('.msrcp')]
     files.sort()
 
     results = []
