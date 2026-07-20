@@ -139,3 +139,19 @@ if __name__ == "__main__":
         title="Profil de performance : CP classique vs CP distribute (Set 1a - 500s)",
         output_filename="profil-performance-cp-distribute-vs-cp.png"
     )
+
+    # 4. CP distribute + symétrie (orange) vs CP classique (rouge)
+    fichier_cp_distribute_symmetry = os.path.join(base_dir, "cp_distribute_symmetry_500s.csv")
+    print("\nGénération du graphique CP classique vs CP distribute + symétrie...")
+    tracer_profil_performance(
+        fichier_1=fichier_cp_distribute_symmetry,
+        fichier_2=fichier_cp,
+        label_1="CP distribute + symétrie",
+        label_2="CP classique",
+        color_1="orange",
+        color_2="red",
+        col_temps_1="CP_Runtime (s)",
+        col_temps_2="CP_Runtime (s)",
+        title="Profil de performance : CP classique vs CP distribute + symétrie (Set 1a - 500s)",
+        output_filename="profil-performance-cp-distribute-symmetry-vs-cp.png"
+    )
