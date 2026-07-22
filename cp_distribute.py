@@ -143,6 +143,8 @@ def solve_cp(filename, timelimit, display_gantt=False):
             mdl.add(mdl.sum(skill_usage) <= skill_capacity[l])
 
     # 10. Bris de symétrie (non-rotation conditionnelle)
+
+    """
     for i in range(nb_tasks):
         if durations_tasks[i] > 1: 
             for v in range(1, len(V[i])): # v in V_i \ {0}
@@ -161,6 +163,7 @@ def solve_cp(filename, timelimit, display_gantt=False):
                                 SW[(w, i, v)] == SW[(w, i, v-1)]
                             )
                         )
+    """
 
 
     # ==========================================
