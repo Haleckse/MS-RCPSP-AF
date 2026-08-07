@@ -1,0 +1,252 @@
+\section{Programmation par Contraintes}
+
+La Programmation par Contraintes (PPC, ou CP en anglais) est un paradigme d'optimisation exacte adapté à la résolution de problèmes combinatoires comme la planification et l'ordonnancement. Contrairement à la programmation linéaire, ce paradigme permet d'exprimer des contraintes non linéaires, logiques ou globales.
+
+\bigskip
+
+En CP, l'utilisateur formule le problème sous forme de contraintes, et le processus de recherche de solutions et de preuve d'optimalité est pris en charge par un solveur générique. Ce solveur repose sur le couplage entre la propagation de contraintes et l'exploration arborescente. Les contraintes globales encapsulent des structures combinatoires récurrentes (telles que l'ordonnancement de tâches ou l'affectation), et leur sont associés des algorithmes de filtrage (propagateurs). Pour l'ordonnancement sous contraintes cumulatives, ces propagateurs utilisent des algorithmes comme le \textit{timetabling} \cite{fahimi2014linear}, le \textit{cumulative edge-finding} \cite{vilim2009edge} ou le raisonnement énergétique \cite{ouellet2018checker}.
+
+\bigskip
+
+L'application de la CP au problème de l'ordonnancement de projet multi-compétences (MS-PSP) qui n'est autre que la version sans contraintes de ressources cumulatives du MS-RCPSP a donné lieu à des travaux notables. Des approches basées sur CP/SAT, le \textit{lazy clause generation} et l'apprentissage de no-goods ont été développées par Young et al. \cite{young2017constraint}. Pour le MS-RCPSP avec préemption et contraintes de ressources, Polo-Mejía et al. \cite{polo2020mixed, polo2023heuristic} ont proposé des modèles en CP exploitant les variables d'intervalles de solveurs comme \textit{IBM ILOG CP Optimizer}. Par ailleurs, des travaux comme ceux de Carlier et Néron \cite{carlier2007computing} ou de Baptiste et Bonifas \cite{baptiste2018redundant} ont montré l'intérêt d'ajouter des enveloppes cumulatives redondantes pour accélérer la convergence.
+
+\bigskip
+
+Ce chapitre présente le formalisme général des CSP, décrit les primitives d'ordonnancement de CP Optimizer, formule les modèles CP monolithique pour le MS-RCPSP-AF, puis analyse ses limites combinatoires.
+
+\subsection{Formalisme des Problèmes de Satisfaction de Contraintes (CSP)}
+Un CSP est défini par un triplet $(X, D, C)$ où :
+\begin{itemize}
+    \item $X = \{x_1, x_2, \dots, x_n\}$ est l'ensemble des variables de décision.
+    \item $D = \{D(x_1), D(x_2), \dots, D(x_n)\}$ représente l'ensemble des domaines associés (les valeurs admissibles pour chaque variable, généralement des entiers).
+    \item $C = \{c_1, c_2, \dots, c_m\}$ est l'ensemble des contraintes qui limitent les combinaisons de valeurs possibles pour les variables.
+\end{itemize}
+
+L'objectif est d'affecter à chaque variable $x_i$ une valeur de son domaine $D(x_i)$ en satisfaisant toutes les contraintes de $C$.
+
+\subsection{Mécanismes de résolution : Propagation et Recherche}
+Pour explorer l'espace des solutions, les solveurs de CP (comme \textit{IBM ILOG CP Optimizer}) couplent deux mécanismes :
+\begin{enumerate}
+    \item \textbf{La propagation de contraintes (filtrage) :} À chaque contrainte $c_j \in C$ est associé un propagateur. Lorsqu'une décision restreint le domaine d'une variable, le propagateur évalue la cohérence locale (comme l'arc-cohérence) et élimine des domaines des autres variables connectées les valeurs devenues incompatibles.
+    \item \textbf{La recherche arborescente (exploration) :} Si la propagation ne suffit pas à obtenir une solution unique, le solveur effectue un branchement (\textit{branching}) : il choisit une variable à domaine multiple, la fixe à une valeur, puis relance la propagation. Si une contrainte est violée (un domaine devient vide), le solveur effectue un retour arrière (\textit{backtracking}) pour essayer une autre branche.
+\end{enumerate}
+
+\subsection{Primitives d'ordonnancement de CP Optimizer}
+Pour modéliser l'ordonnancement, les solveurs comme \textit{IBM ILOG CP Optimizer} disposent de primitives de haut niveau qui évitent de discrétiser le temps de façon externe.
+
+\subsubsection{Variables d'intervalles (Interval Variables)}
+Une variable d'intervalle, notée $a$, représente une tâche ou une partie de tâche définie par un début $a.\text{start}$, une fin $a.\text{end}$, et une durée $a.\text{size}$, liés par la relation $a.\text{end} = a.\text{start} + a.\text{size}$.
+De plus, une variable d'intervalle peut être \textbf{optionnelle} : le solveur décide alors de sa présence ou non dans la solution ($a.\text{present} \in \{0, 1\}$). Si l'intervalle est absent, ses attributs de temps sont ignorés par les contraintes associées.
+
+\subsubsection{Contraintes temporelles}
+Les relations de précédence et de synchronisation entre activités s'expriment avec des contraintes spécifiques :
+\begin{itemize}
+    \item \textbf{\texttt{endBeforeStart}(a, b, z) :} Impose que le début de l'intervalle $b$ soit postérieur ou égal à la fin de l'intervalle $a$, avec un délai de transition $z$ :
+    \begin{equation}
+        b.\text{start} \geq a.\text{end} + z
+    \end{equation}
+    Cette contrainte n'est active que si $a$ et $b$ sont présents.
+
+    \item \textbf{\texttt{startAtEnd}(a, b) :} Impose que l'intervalle $a$ commence exactement au moment où l'intervalle $b$ se termine :
+    \begin{equation}
+        a.\text{start} = b.\text{end}
+    \end{equation}
+    Cette contrainte sert à modéliser des jonctions temporelles sans interruption.
+
+    \item \textbf{\texttt{span}(a, $\{b_1, \dots, b_k\}$) :} Force l'intervalle $a$ à couvrir l'ensemble des intervalles présents du groupe $\{b_1, \dots, b_k\}$. Ainsi, $a$ débute au début du premier intervalle actif et se termine à la fin du dernier intervalle actif du groupe :
+    \begin{equation}
+        a.\text{start} = \min_{1 \le i \le k} \{ b_i.\text{start} \mid b_i.\text{present} = 1 \}
+    \end{equation}
+    \begin{equation}
+        a.\text{end} = \max_{1 \le i \le k} \{ b_i.\text{end} \mid b_i.\text{present} = 1 \}
+    \end{equation}
+
+    \item \textbf{\texttt{alternative}(a, $\{b_1, \dots, b_k\}$, c) :} Associe un intervalle global $a$ à un ensemble de sous-intervalles optionnels $\{b_1, \dots, b_k\}$. Si $a$ est présent, exactement $c$ sous-intervalles parmi $\{b_1, \dots, b_k\}$ doivent être présents, et ces $c$ sous-intervalles sélectionnés doivent commencer et finir en même temps que $a$. Dans sa version standard ($c=1$), cette contrainte modélise le choix d'une ressource unique parmi plusieurs alternatives.
+\end{itemize}
+
+\subsubsection{Ressources disjonctives et cumulatives}
+\begin{itemize}
+    \item \textbf{Non-chevauchement (\texttt{noOverlap}) :} Pour modéliser une ressource disjonctive (comme un travailleur qui ne peut exécuter qu'une seule tâche à la fois), on regroupe les variables d'intervalles affectées à cette ressource dans une contrainte \texttt{noOverlap}. Elle garantit que deux intervalles présents ne se chevauchent pas dans le temps.
+
+\end{itemize}
+
+\subsection{Modélisation CP monolithique pour le MS-RCPSP-AF}
+Afin de modéliser la flexibilité d'affectation sans préemption de la tâche globale, nous développons un modèle par programmation par contraintes fondé sur la discrétisation interne des activités en parties unitaires.
+
+\subsubsection{Ensembles et paramètres}
+Le modèle réutilise les ensembles de base introduits au Chapitre 1 ($\mathcal{A}$, $\mathcal{L}$, $\mathcal{W}$, $\mathcal{CR}$, $E$) et y ajoute l'ensemble suivant :
+\begin{itemize}
+    \item $V_i = \{1, \dots, p_i\}$ : Ensemble des parties de durée unitaire de l'activité $i \in \mathcal{A}$, indexées par $v$.
+\end{itemize}
+
+Nous définissons le paramètre supplémentaire suivant :
+\begin{itemize}
+    \item $N_l$ : Nombre total de travailleurs maîtrisant la compétence $l$ dans l'ensemble $\mathcal{W}$.
+\end{itemize}
+
+\subsubsection{Variables de décision}
+Le modèle utilise des variables d'intervalles à plusieurs niveaux :
+\begin{itemize}
+    \item $C_{\max} \ge 0$ : Variable entière représentant la date de fin globale du projet.
+    \item $act_i$ : Variable d'intervalle représentant l'exécution globale de l'activité $i$, de taille $p_i$.
+    \item $par_{i,v}$ : Variable d'intervalle de durée unitaire représentant la $v$-ème partie de l'activité $i$ (pour $v \in V_i$).
+    \item $awo_{w,i,l,v}$ : Variable d'intervalle optionnelle de durée unitaire représentant l'affectation du travailleur $w$ exerçant la compétence $l$ pour la $v$-ème partie de l'activité $i$.
+\end{itemize}
+
+\subsubsection{Formulation mathématique}
+Le modèle CP monolithique s'écrit de la manière suivante :
+
+\begin{align}
+    \min \quad & C_{\max} \label{cp_obj} \\
+    \text{s.t.} \quad & \nonumber \\
+    & C_{\max} \geq act_i.\text{end} && \forall i \in \mathcal{A} \label{cp_makespan} \\
+    & \text{span}(act_i, \{par_{i,v} \mid v \in V_i\}) && \forall i \in \mathcal{A} \label{cp_span} \\
+    & \text{startAtEnd}(par_{i,v+1}, par_{i,v}) && \forall i \in \mathcal{A}, \forall v \in \{1, \dots, p_i-1\} \label{cp_contig} \\
+    & \text{endBeforeStart}(act_i, act_m) && \forall (i,m) \in E \label{cp_prec} \\
+    & \sum_{i \in \mathcal{A}} \text{pulse}(act_i, b_{i,k}) \leq B_k && \forall k \in \mathcal{CR} \label{cp_cumul_mat} \\
+    & \text{noOverlap}(\{awo_{w,i,l,v} \mid \forall i \in \mathcal{A}, \forall l \in \mathcal{L}, \forall v \in V_i\}) && \forall w \in \mathcal{W} \label{cp_disj_w} \\
+    & \text{alternative}(par_{i,v}, \{awo_{w,i,l,v} \mid \forall w \in \mathcal{W} \text{ s.t. } m_{w,l}=1\}, a_{i,l}) && \forall i \in \mathcal{A}, \forall v \in V_i, \forall l \in \mathcal{L} \label{cp_alt_l} \\
+    & \text{alternative}(par_{i,v}, \{awo_{w,i,l,v} \mid \forall w \in \mathcal{W}, \forall l \in \mathcal{L}\}, q_i) && \forall i \in \mathcal{A}, \forall v \in V_i \label{cp_alt_q}
+\end{align}
+
+\subsubsection{Explication des contraintes}
+\begin{itemize}
+    \item L'équation (\ref{cp_makespan}) définit le makespan à minimiser comme supérieur ou égal à la fin de chaque activité globale $act_i$.
+    \item La contrainte (\ref{cp_span}) lie l'activité globale $act_i$ à l'ensemble de ses sous-intervalles unitaires $par_{i,v}$.
+    \item L'équation (\ref{cp_contig}) assure la contiguïté temporelle (non-préemption) en forçant la fin de la partie $v$ à coïncider avec le début de la partie $v+1$.
+    \item La contrainte de précédence (\ref{cp_prec}) assure les relations d'ordre du projet entre les activités globales.
+    \item L'équation (\ref{cp_cumul_mat}) restreint l'usage simultané des ressources matérielles cumulatives à leur capacité $B_k$.
+    \item L'équation (\ref{cp_disj_w}) garantit la disjonction de chaque travailleur : un opérateur $w$ ne peut pas travailler sur plusieurs tâches ou plusieurs compétences en même temps.
+    \item La contrainte alternative (\ref{cp_alt_l}) modélise la flexibilité : pour chaque partie unitaire $v$ de l'activité $i$ et pour chaque compétence $l$, elle force la sélection d'exactement $a_{i,l}$ intervalles optionnels d'affectation parmi les travailleurs qualifiés.
+    \item L'équation (\ref{cp_alt_q}) fait de même pour satisfaire la contrainte d'effectif physique minimum global $q_i$ sur chaque partie unitaire.
+\end{itemize}
+
+\subsubsection{Contraintes redondantes de capacité globale}
+Afin d'accélérer la propagation et d'aider le solveur à détecter plus rapidement les surcharges de capacité de main-d'œuvre, nous introduisons des enveloppes cumulatives globales redondantes :
+\begin{align}
+    & wU = \sum_{i \in \mathcal{A}} \text{pulse}(act_i, q_i) \leq |\mathcal{W}| \label{cp_red_w} \\
+    & sU_l = \sum_{i \in \mathcal{A}} \text{pulse}(act_i, a_{i,l}) \leq N_l && \forall l \in \mathcal{L} \label{cp_red_l}
+\end{align}
+Ces enveloppes ne modifient pas l'espace des solutions, mais renforcent les mécanismes de filtrage en évaluant la demande de main-d'œuvre au niveau des activités globales $act_i$ plutôt que sur chaque partie unitaire.
+
+\subsection{Variante : Modélisation par Contrainte de Cardinalité Globale (GCC)}
+
+La modélisation CP présentée ci-dessus engendre un nombre massif de variables d'intervalles optionnelles ($awo_{w,i,l,v}$), dépassant fréquemment 10~000 à 25~000 variables sur des instances de taille moyenne. Ce volume considérable crée un surcoût mémoire important et alourdit le travail du moteur de propagation à chaque nœud de l'arbre de recherche.
+
+\bigskip
+
+Pour pallier cette limitation et tenter de fluidifier la résolution, nous avons conçu une modélisation alternative reposant sur la Contrainte de Cardinalité Globale (GCC, ou \textit{Global Cardinality Constraint}). L'objectif principal est de réduire le nombre de variables d'intervalles en éliminant leur indexation par la compétence $l$. L'affectation est ainsi déportée sur des variables entières $SW_{w,i,v}$ associées à la primitive \texttt{distribute} de CP Optimizer, qui permet d'imposer des fréquences d'apparition exactes des valeurs d'un tableau de variables.
+
+\subsubsection{Variables de décision du modèle GCC}
+
+Pour chaque tâche $i \in \mathcal{A}$, chaque partie unitaire $v \in V_i$, et chaque travailleur $w \in \mathcal{W}$, nous définissons :
+\begin{itemize}
+    \item Une variable entière d'affectation de compétence, notée $SW_{w,i,v}$, représentant la compétence que le travailleur $w$ utilise pour réaliser la partie $v$ de la tâche $i$.
+    \item Le domaine de cette variable $SW_{w,i,v}$ est restreint à :
+    \begin{equation}
+        \mathcal{D}(SW_{w,i,v}) = \{0\} \cup \left( \mathcal{MS}_w \cap \mathcal{SA}_i \right)
+    \end{equation}
+    où :
+    \begin{itemize}
+        \item La valeur $0$ signifie que le travailleur $w$ n'est pas affecté à la tâche $i$ à l'instant $v$.
+        \item Un entier $l \ge 1$ représente l'indice de la compétence exercée.
+        \item $\mathcal{MS}_w$ est l'ensemble des compétences maîtrisées par le travailleur $w$.
+        \item $\mathcal{SA}_i$ est l'ensemble des compétences exigées par la tâche $i$.
+    \end{itemize}
+    \item Une variable d'intervalle optionnelle $AW_{w,i,v}$ représentant la présence du travailleur $w$ sur la partie $v$ de la tâche $i$. Cette variable d'intervalle est synchronisée avec la variable entière $SW_{w,i,v}$ par la contrainte logique :
+    \begin{equation}
+        \text{presence\_of}(AW_{w,i,v}) \iff \left( SW_{w,i,v} > 0 \right)
+    \end{equation}
+\end{itemize}
+
+\subsubsection{Formulation du modèle GCC et contraintes d'affectation}
+
+La modélisation par contrainte de cardinalité globale repose sur trois contraintes qui complètent les contraintes temporelles du modèle monolithique (équations~\ref{cp_span}--\ref{cp_cumul_mat}) :
+
+\begin{align}
+    & \text{distribute}\left( cards,\ \{SW_{w,i,v} \mid w \in \mathcal{W}\},\ values \right) && \forall i \in \mathcal{A},\ \forall v \in V_i \label{gcc_dist} \\
+    & \text{alternative}\left( par_{i,v},\ \{AW_{w,i,v} \mid w \in \mathcal{W}\},\ \sum_{l \in \mathcal{L}} a_{i,l} \right) && \forall i \in \mathcal{A},\ \forall v \in V_i \label{gcc_alt} \\
+    & \text{noOverlap}\left( \{AW_{w,i,v} \mid i \in \mathcal{A},\ v \in V_i\} \right) && \forall w \in \mathcal{W} \label{gcc_disj}
+\end{align}
+
+où $values = [0, 1, 2, \dots, |\mathcal{L}|]$ désigne les valeurs d'affectation possibles ($0$ pour l'inactivité, $l \ge 1$ pour la compétence $l$), et $cards$ est le vecteur de cardinalités défini par :
+\begin{equation}
+    cards[0] = |\mathcal{W}| - \sum_{l \in \mathcal{L}} a_{i,l} \qquad \text{et} \qquad cards[l] = a_{i,l} \quad \forall l \in \mathcal{L}
+    \label{gcc_cards}
+\end{equation}
+
+\begin{itemize}
+    \item La contrainte~(\ref{gcc_dist}) assure le respect des exigences en compétences : pour chaque partie unitaire $v$ de la tâche $i$, elle force exactement $a_{i,l}$ travailleurs à prendre la valeur $l$ dans $\{SW_{w,i,v} \mid w \in \mathcal{W}\}$, et $|\mathcal{W}| - \sum_{l \in \mathcal{L}} a_{i,l}$ travailleurs à prendre la valeur $0$ (non affectés).
+    \item La contrainte~(\ref{gcc_alt}) lie temporellement les parties unitaires $par_{i,v}$ aux variables d'intervalles d'affectation $AW_{w,i,v}$ : si $par_{i,v}$ est présente, exactement $\sum_{l \in \mathcal{L}} a_{i,l}$ travailleurs sont actifs et partagent ses dates de début et de fin.
+    \item La contrainte~(\ref{gcc_disj}) garantit la disjonction de chaque travailleur $w$ : ses intervalles d'affectation $AW_{w,i,v}$ ne peuvent pas se chevaucher dans le temps.
+\end{itemize}
+
+
+\subsection{Contraintes de bris de symétrie}
+Ces formulations monolithique en CP présentent des symétries de permutation. Si plusieurs travailleurs possèdent les mêmes compétences, les solutions consistant à permuter ces travailleurs sur des tâches identiques sont équivalentes pour le makespan, mais obligent le solveur à explorer des branches inutilement.
+
+\bigskip
+
+Pour limiter ces symétries, nous introduisons une contrainte forçant la conservation de l'affecta\-tion des travailleurs entre les unités de temps, sauf lorsqu'une nouvelle activité débute. Autrement dit, si une partie unitaire $par_{i,v}$ ($v \geq 1$) est active alors qu'aucune tâche ne débute à cet instant, l'affectation des travailleurs pour la compétence $l$ sur cette partie $v$ est forcée d'être identique à celle de la partie précédente $v-1$.
+
+\bigskip
+
+La contrainte s'exprime ainsi :
+\begin{equation}
+    \text{IloIfThen}( PaS - \text{pulse}(par_{i,v},1) \leq -1 , awo_{w,i,l,v} = awo_{w,i,l,v-1}  ) \quad \forall l \in \mathcal{L},\forall w \in \mathcal{W}, \forall i \in \mathcal{A}, \forall v \in V_i \setminus\{0\} \label{cp_sym_break}
+\end{equation}
+
+\noindent Avec :
+\begin{equation}
+     PaS = \sum_{i \in \mathcal{A}}\text{pulse}(par_{i,0} , 1)
+\end{equation}
+qui vaut zéro partout sauf lorsqu'au moins une tâche débute (c'est-à-dire lors de l'exécution de la première partie unitaire $par_{i,0}$ de n'importe quelle activité $i$).
+
+Ainsi, si une partie unitaire $par_{i,v}$ ($v \geq 1$) est active alors qu'aucune tâche ne débute à cet instant ($PaS = 0$, donc $PaS - \text{pulse}(par_{i,v},1) = -1$), l'affectation des travailleurs pour la compétence $l$ sur cette partie $v$ est forcée d'être identique à celle de la partie précédente $v-1$.
+
+\subsection{Limites des modèles CP monolithiques}
+
+Ces formulations monolithiques en CP offrent un cadre de modélisation lisible grâce aux primitives de CP Optimizer (\texttt{interval}, \texttt{alternative}) ainsi que des solutions tout-en-un gérant à la fois les contraintes d'ordonnancement et d'affectation. Cependant, leur mise en œuvre sur des instances de taille moyenne à grande se heurte à des limites de passage à l'échelle. Cette section en analyse les facteurs majeurs.
+
+\subsubsection{Explosion dimensionnelle du nombre de variables}
+
+La flexibilité d'affectation autorise les travailleurs à se relayer au cours de l'exécution d'une même activité. Pour capturer ce comportement sans perdre la continuité temporelle de la tâche, le modèle fragmente chaque activité $i \in \mathcal{A}$ de durée $p_i$ en $p_i$ sous-activités unitaires de durée~1, notées $par_{i,v}$. Prenons le cas de la première formulation :
+
+\begin{enumerate}
+    \item \textbf{Variables d'intervalles unitaires :} Pour chaque tâche $i$, on génère $p_i$ variables d'intervalles obligatoires $par_{i,v}$.
+    \item \textbf{Variables d'intervalles optionnelles d'affectation :} Pour chaque sous-activité unitaire $par_{i,v}$, pour chaque compétence $l$ exigée et pour chaque travailleur $w$ maîtrisant cette compétence ($m_{w,l} = 1$), on crée une variable d'intervalle optionnelle $awo_{w,i,l,v}$.
+\end{enumerate}
+
+Le nombre de variables d'intervalles optionnelles à gérer s'exprime par la relation :
+\begin{equation}
+    N_{opt} = \sum_{i \in \mathcal{A}} p_i \sum_{l \in \mathcal{L}} a_{i,l} \sum_{w \in \mathcal{W}} m_{w,l}
+\end{equation}
+
+Pour une instance standard de taille moyenne (30 tâches, 5 compétences, 16 travailleurs polyvalents et des durées $p_i \approx 15$), $N_{opt}$ dépasse 10~000 à 25~000 variables optionnelles. Cette dimensionnelle sature la mémoire vive et pèse sur le moteur de propagation de CP Optimizer, qui doit maintenir la cohérence de ces contraintes d'alternatives.
+
+\subsubsection{Perte de la structure globale d'ordonnancement et faiblesse de la propagation}
+
+La fragmentation des activités en intervalles unitaires réduit l'efficacité de la structure des tâches. Au lieu de manipuler des blocs temporels (ce pour quoi CP Optimizer est optimisé via des propagateurs spécifiques comme le \textit{edge-finding}), le solveur traite des micro-intervalles chaînés.
+
+Cette structure présente deux faiblesses :
+\begin{itemize}
+    \item \textbf{Faiblesse du filtrage des ressources :} Les contraintes cumulatives de capacité de ressources (exprimées par \texttt{pulse} ou \texttt{alwaysIn}) sont propagées localement sur chaque micro-intervalle de durée 1. Le solveur peine à projeter les conflits de ressources sur le long terme car il ne perçoit plus la tâche comme un bloc consommant des ressources sur toute sa durée.
+    \item \textbf{Surcharge du réseau de contraintes de précédence :} Pour assurer la contiguïté temporelle de l'activité, le modèle impose des contraintes de séquencement strictes entre chaque partie unitaire successive. Ce chaînage crée un réseau de précédences dense qui ralentit la propagation des fenêtres de temps.
+\end{itemize}
+
+\subsubsection{Symétries et inefficacité des contraintes de bris de symétrie}
+
+Le MS-RCPSP-AF souffre d'une forte symétrie de permutation des travailleurs. Si deux travailleurs possèdent le même profil de compétences, toute permutation de ces travailleurs produit des plannings équivalents pour le makespan.
+
+\bigskip
+
+Dans ces modèles, cette symétrie est accentuée par la discrétisation \mbox {temporelle :}
+le solveur explore des permutations de travailleurs d'une unité de temps à l'autre au sein d'une même tâche. Par exemple, affecter un travailleur sur la première moitié d'une tâche et un autre sur la seconde moitié, ou vice-versa, est traité comme deux branches distinctes, alors que le makespan global reste inchangé.
+
+\bigskip
+
+L'ajout de contraintes de bris de symétrie vise à élaguer ces branches redondantes. Cependant, comme observé expérimentalement au chapitre~4, ces contraintes imposent un coût de filtrage trop lourd, conduisant à des dégradations de performances et à des timeouts supplémentaires.
+
+\bigskip
+
+Ces limites mettent en évidence l'intérêt d'envisager des méthodes de décomposition comme la LBBD. En séparant l'ordonnancement de l'affectation des ressources (déléguée à un sous-problème), la LBBD s'affranchit de la discrétisation temporelle et de l'explosion du nombre de variables associée.

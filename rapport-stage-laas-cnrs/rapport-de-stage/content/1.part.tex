@@ -1,0 +1,140 @@
+\section{Programmation linéaire en nombres entiers}
+
+La Programmation Linéaire en Nombres Entiers (PLNE, ou MILP en anglais) est un outil d'optimisation classique en Recherche Opérationnelle pour résoudre les problèmes de décision complexes. La MILP permet de modéliser des problèmes NP-difficiles \cite{karp2010reducibility} en combinant une formulation mathématique avec la puissance des solveurs numériques \cite{papadimitriou1998combinatorial}.
+
+\bigskip
+
+Dans le cadre du RCPSP et du MS-RCPSP, la MILP a constitué l'une des premières approches de résolution exacte \cite{demeulemeester2006project}. Les formulations linéaires décrivent les relations temporelles entre tâches et les contraintes d'affectation. En particulier, les formulations indexées par le temps (où l'horizon temporel est discrétisé en unités de temps) servent de référence dans la littérature pour évaluer d'autres paradigmes \cite{almeida2019modeling}. Ces modèles linéaires sont aussi utilisés dans des approches hybrides, que ce soit lors d'une décomposition de Benders \cite{LiHaitao2009Spwm, li2015benders} ou pour la génération de colonnes \cite{correia2015modeling, montoya2014branch}.
+
+\bigskip
+
+Ce chapitre présente les bases théoriques de la MILP, les mécanismes de résolution des solveurs, puis détaille la modélisation mathématique du problème du MS-RCPSP-AF inspirée de Polo-Mejía et al. \cite{polo2020mixed, polo2023heuristic, polomejia:tel-02309284}.
+
+\subsection{Structure d'un modèle MILP}
+Un programme linéaire en nombres entiers comporte trois éléments principaux :
+\bigskip
+
+\noindent\textbf{Les variables de décision :} Ce sont les inconnues à déterminer pour résoudre le problème. En MILP, ces variables prennent des valeurs entières, et sont souvent binaires (0 ou 1) pour représenter des choix de type oui/non.
+\bigskip
+
+\noindent\textbf{La fonction objectif :} Une fonction linéaire à optimiser (généralement la minimisation de la date de fin de projet, le makespan). Elle s'exprime comme une somme de variables pondérées par des coefficients, mais dans notre modèle, elle se réduit à la minimisation d'une unique variable représentée par le makespan.
+\bigskip
+
+\noindent\textbf{Les contraintes :} Un ensemble d'équations et d'inégalités linéaires qui limitent l'espace des solutions réalisables (capacités, précédences ou limites de ressources). Les multiplications de variables ou les conditions logiques directes y sont interdites pour conserver la linéarité.
+\bigskip
+
+\subsection{Mécanismes de résolution} Contrairement à la programmation linéaire continue, qui se résout en pratique en temps polynomial (bien que l'algorithme du Simplexe ait une complexité exponentielle dans le pire des cas), la contrainte d'intégralité des variables rend la MILP NP-difficile. L'espace des solutions réalisables se limite alors à un ensemble de points discrets.
+
+\bigskip
+
+Pour explorer cet espace, les solveurs modernes (comme Gurobi ou IBM ILOG CPLEX) combinent la programmation linéaire continue avec des algorithmes d'exploration arborescente, principalement la méthode de Séparation et Évaluation (Branch-and-Bound) et le Branch-and-Cut.
+
+\bigskip
+
+La relaxation continue : À chaque nœud de l'arbre de recherche, le solveur résout le problème en omettant la contrainte d'intégralité des variables, ce qui fournit une borne inférieure pour un problème de minimisation.
+
+\bigskip
+
+Branching : Si une variable devant être entière prend une valeur fractionnaire (par exemple 2,4) dans la relaxation continue, le solveur sépare l'espace de recherche en créant deux sous-nœuds : l'un imposant que la variable soit inférieure ou égale à 2, et l'autre supérieure ou égale à 3.
+
+\bigskip
+
+L'élagage (Bounding and Pruning) : L'arbre est exploré de manière itérative. Si la borne continue calculée à un nœud est moins bonne qu'une solution entière déjà connue (la borne supérieure), le solveur coupe ce nœud et sa descendance pour éviter une recherche inutile.
+
+\subsection{Application au MS-RCPSP-AF}
+
+Nous formalisons ici le MS-RCPSP-AF sous forme de modèle MILP pour poser les bases mathématiques du problème avant de détailler la modélisation par programmation par contraintes.
+
+
+\subsubsection{Ensembles}
+\begin{itemize}
+    \item $\mathcal{A}$ : Ensemble des activités à planifier.
+    \item $\mathcal{L}$ : Ensemble des différentes compétences.
+    \item $\mathcal{W}$ : Ensemble des ressources multi-compétences (travailleurs).
+    \item $\mathcal{CR}$ : Ensemble des ressources cumulatives.
+    \item $\mathcal{T}$ : Horizon temporel, $\mathcal{T} = \{1, \dots, T\}$, indexé par $t$.
+    \item $E$ : Ensemble des contraintes de précédence.
+\end{itemize}
+
+\subsubsection{Paramètres}
+\begin{itemize}
+    \item $p_i$ : Temps de traitement de l'activité $i$.
+    \item $B_k$ : Capacité de la ressource $k$.
+    \item $b_{i,k}$ : Quantité de ressource $k$ requise pour l'activité $i$.
+    \item $a_{i,l}$ : Nombre de travailleurs maîtrisant la compétence $l$ requis pour l'activité $i$.
+    \item $m_{w,l}$ : Égal à 1 si le travailleur $w$ maîtrise la compétence $l$, 0 sinon.
+    \item $q_i$ : Nombre minimum de travailleurs requis pour l'activité $i$.
+    \item $r_i, d_i$ : Date de disponibilité et date d'échéance autorisées pour l'activité $i$.
+\end{itemize}
+
+\subsubsection{Variables de décision}
+\begin{itemize}
+    \item $x_{i,t} \in \{0, 1\}$ : Égal à 1 si l'activité $i$ est exécutée à l'instant $t$, 0 sinon.
+    \item $z_{w,i,l,t} \in \{0, 1\}$ : Égal à 1 si le travailleur $w$ est affecté à l'activité $i$ pour exercer la compétence $l$ à l'instant $t$, 0 sinon.
+\end{itemize}
+
+\subsubsection{Fonction objectif}
+L'objectif est de minimiser la durée totale d'exécution du projet (\textit{Makespan}) :
+\begin{equation}
+    \min \quad C_{\max}
+\end{equation}
+
+\subsubsection{Contraintes}
+
+\noindent \textbf{Unicité d'affectation :} Un travailleur peut être affecté au maximum à une seule activité et seulement une seule compétence ne peut etre utilisée à un instant $t$.
+\begin{equation}
+    \sum_{i \in \mathcal{A}} \sum_{l \in \mathcal{L}} z_{w,i,l,t} \leq 1 \quad \forall w \in \mathcal{W}, \forall t \in \mathcal{T} \label{ilp_unicity}
+\end{equation}
+
+\noindent \textbf{Validation de la maîtrise des compétences :} Un travailleur ne peut utiliser une compétence que s'il la maîtrise.
+\begin{equation}
+    z_{w,i,l,t} \leq m_{w,l} \quad \forall w \in \mathcal{W}, \forall i \in \mathcal{A}, \forall l \in \mathcal{L}, \forall t \in \mathcal{T} \label{ilp_mastery}
+\end{equation}
+
+\noindent \textbf{Couverture des exigences en compétences :} Si une activité est active ($x_{i,t} = 1$), le nombre d'opérateurs affectés à la compétence $l$ doit couvrir le besoin requis $a_{i,l}$.
+\begin{equation}
+    \sum_{w \in \mathcal{W}} z_{w,i,l,t} \geq a_{i,l} \cdot x_{i,t} \quad \forall l \in \mathcal{L}, \forall i \in \mathcal{A}, \forall t \in \mathcal{T} \label{ilp_cov}
+\end{equation}
+
+\noindent \textbf{Respect de l'effectif minimum requis pour une activité :} Le nombre total d'affectations pour l'activité $i$ à l'instant $t$ doit être supérieur ou égal à l'exigence $q_i$.
+\begin{equation}
+    \sum_{w \in \mathcal{W}} \sum_{l \in \mathcal{L}} z_{w,i,l,t} \geq q_i \cdot x_{i,t} \quad \forall i \in \mathcal{A}, \forall t \in \mathcal{T} \label{ilp_min_w}
+\end{equation}
+
+\noindent \textbf{Respect des durées de traitement :} Chaque activité doit s'exécuter pendant exactement $p_i$ périodes sur son intervalle de temps admissible.
+\begin{equation}
+    \sum_{t=r_i}^{d_i} x_{i,t} = p_i \quad \forall i \in \mathcal{A} \label{ilp_duration}
+\end{equation}
+
+\noindent \textbf{Contraintes de précédence :} Une activité successeur $j$ ne peut pas démarrer tant que son activité prédécesseur $i$ n'est pas achevée.
+\begin{equation}
+    p_i \cdot (1 - x_{j,t}) \geq \sum_{t'=t}^T x_{i,t'} \quad \forall (i,j) \in E, \forall t \in \mathcal{T} \label{ilp_prec}
+\end{equation}
+
+\noindent \textbf{Capacité des ressources matérielles cumulatives :} L'utilisation des ressources matérielles cumulatives à l'instant $t$ est limitée à leur capacité globale $B_k$.
+\begin{equation}
+    \sum_{i \in \mathcal{A}} b_{i,k} \cdot x_{i,t} \leq B_k \quad \forall k \in \mathcal{CR}, \forall t \in \mathcal{T} \label{ilp_material}
+\end{equation}
+
+\noindent \textbf{Définition de la borne inférieure du Makespan}
+\begin{equation}
+    C_{\max} \geq t \cdot x_{i,t} \quad \forall i \in \mathcal{A}, \forall t \in \mathcal{T}
+\end{equation}
+
+\noindent Cette contrainte lie la variable $C_{\max}$ au déroulement du projet. Le modèle étant indexé par le temps, si une activité $i$ s'exécute à l'instant $t$ ($x_{i,t} = 1$), l'inéquation force le $C_{\max}$ à être supérieur ou égal à cet instant $t$. Lors de la minimisation de la fonction objectif, la variable $C_{\max}$ prend la valeur du dernier instant $t$ où une tâche est active, ce qui correspond à la date de fin globale.
+
+\subsection{Limites de la formulation MILP}
+Le modèle MILP fournit une formulation exacte du problème du MS-RCPSP-AF, mais présente des limites pratiques pour la résolution d'instances de taille moyenne ou grande.
+
+\subsubsection{Explosion du nombre de variables avec l'horizon temporel}
+L'utilisation de variables indexées par le temps ($x_{i,t}$ et $z_{w,i,l,t}$) rend la taille du modèle dépendante de l'horizon temporel $T$. Le nombre de variables d'affectation $z_{w,i,l,t}$ s'élève à $|\mathcal{W}| \times |\mathcal{A}| \times |\mathcal{L}| \times T$. Si $T$ est grand, le solveur doit gérer un grand nombre de variables binaires, ce qui sature la mémoire et rend la phase de séparation (\textit{Branching}) longue et difficile.
+
+\subsubsection{Faiblesse de la relaxation continue}
+Les formulations indexées par le temps pour l'ordonnancement présentent souvent une relaxation continue faible. Lorsque les variables binaires $x_{i,t}$ et $z_{w,i,l,t}$ sont relâchées dans l'intervalle $[0, 1]$, le solveur linéaire trouve des solutions fractionnaires où les tâches sont fragmentées dans le temps. La borne inférieure fournie par cette relaxation est alors éloignée de la valeur entière optimale, ce qui oblige le solveur à explorer un grand nombre de nœuds dans l'arbre de recherche.
+
+\subsubsection{Linéarisation des relations logiques}
+Conserver un formalisme linéaire impose de linéariser les contraintes logiques. Pour les contraintes de précédence (\ref{ilp_prec}) :
+\begin{equation*}
+    p_i \cdot (1 - x_{j,t}) \geq \sum_{t'=t}^T x_{i,t'} \quad \forall (i,j) \in E, \forall t \in \mathcal{T}
+\end{equation*}
+Si le successeur $j$ s'exécute à l'instant $t$ ($x_{j,t}=1$), le membre de gauche s'annule, forçant le prédécesseur $i$ à être inactif à partir de cet instant $t$. Si $j$ n'est pas actif à l'instant $t$ ($x_{j,t}=0$), la contrainte devient triviale ($p_i \geq \sum x_{i,t'}$) car la somme des périodes d'activité de $i$ ne dépasse pas sa durée $p_i$. Cette linéarisation doit être écrite pour chaque période $t$ et chaque arc du graphe de précédence $E$, ce qui augmente le nombre de contraintes à gérer par le solveur.

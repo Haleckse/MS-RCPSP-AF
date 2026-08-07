@@ -1,0 +1,9 @@
+L'optimisation de l'ordonnancement de projets avec ressources multi-compétences et flexibilité d'affectation (MS-RCPSP-AF) pose d'importants défis combinatoires. Ce stage vise à comparer différents paradigmes de résolution exacte pour ce problème. Nous analysons et évaluons les performances de modèles monolithiques en Programmation Linéaire en Nombres Entiers (MILP) et en Programmation par Contraintes (CP) face à une méthode de Décomposition de Benders basée sur la Logique (LBBD).
+\smallskip
+\noindent
+Nous présentons d'abord une formulation en MILP indexée par le temps et un modèle en CP discret découpant les tâches en sous-intervalles unitaires pour modéliser le remplacement dynamique des opérateurs. Pour le modèle en CP, nous étudions également une formulation alternative basée sur la contrainte de cardinalité globale (GCC) et l'ajout de contraintes de bris de symétrie. Face aux limites physiques et combinatoires de ces modèles monolithiques, nous implémentons un algorithme de LBBD. Cette méthode découple l'ordonnancement global, traité par un problème maître en CP, de l'affectation des travailleurs à chaque période, résolue par des algorithmes de flot maximum.
+\smallskip
+\noindent
+Les résultats expérimentaux obtenus sur deux benchmarks de la littérature montrent que la décomposition LBBD résout entre 94\,\% et 97\,\% des instances en quelques secondes, surpassant nettement les approches monolithiques.
+
+

@@ -1,0 +1,413 @@
+\documentclass[preprint, authoryear,11pt]{elsarticle}
+
+%\RequirePackage[sort&compress,numbers]{natbib}
+%\bibliographystyle{new-aiaa}
+
+\usepackage{colortbl}
+\usepackage{changes}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\newtheorem{theorem}{Theorem}
+\linespread{1.5}
+\title{Benders Method for Multi-Skill Resource-Constrained Project Scheduling with Allocation Flexibility}
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm, marginparwidth=1.5cm]{geometry}
+
+
+% Other utility packages
+%\usepackage[french]{babel}
+\usepackage[]{amsmath}
+\usepackage[]{amssymb}
+\usepackage{rotating}
+\usepackage[]{array}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage[]{gensymb}
+\usepackage[colorlinks=true, allcolors=black]{hyperref}
+\urlstyle{same}
+\setlength{\marginparwidth}{2cm}
+\usepackage{todonotes}
+\usepackage[center]{caption}
+\usepackage[export]{adjustbox}
+\usepackage[]{float}
+% Table caption on top
+% \floatstyle{plaintop}
+\restylefloat{table}
+%\restylefloat{figure}
+
+\usepackage{tikz}
+
+\usepackage[]{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepgfplotslibrary{external}
+%\tikzexternalize
+\usepackage[]{ragged2e}
+\usepackage[]{xcolor}
+\usepackage[]{comment}
+\usepackage[section]{placeins}
+\usepackage[]{booktabs}
+\usepackage{pdfpages}
+\usepackage{fancyhdr}
+\usepackage{svg}
+\usepackage{import}
+\usepackage{siunitx}
+\usepackage[makeroom]{cancel}
+\usepackage{multicol}
+\usepackage{pgfgantt}
+\usepackage[version=4]{mhchem}
+% For symbols list
+\usepackage[intoc]{nomencl}
+\makenomenclature
+\usepackage{wrapfig}
+\usepackage{lscape}
+\usepackage{listings}
+\usepackage{tabularx}
+\usepackage{mathtools}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\newcommand{\A}{\mathcal{A}}
+\newcommand{\R}{\mathcal{CR}}
+\newcommand{\T}{\mathcal{T}}
+\newcommand{\Ll}{\mathcal{L}}
+\newcommand{\nSk}{nS}
+\newcommand{\nWo}{nW}
+\newcommand{\WoUsage}{wU}
+\newcommand{\SkillUsage}{sU}
+\newcommand{\pres}{pr}
+\newcommand{\avWo}{aW}
+\newcommand{\avSk}{aS}
+\newcommand{\act}{\texttt{act}}
+\newcommand{\pa}{\texttt{par}}
+\newcommand{\awo}{\texttt{awo}}
+\newcommand{\abs}{\texttt{abs}}
+
+\newcommand\pbe{MS-RCPSP-AF}
+\newtheorem{example}{Example}
+\usepackage[skins,minted]{tcolorbox}
+
+\usepackage{xfrac}
+\sisetup{per-mode=fraction, exponent-product=\cdot}
+
+\newcommand{\cistian}[1]{\textcolor{red}{#1}}
+
+
+\begin{document}
+\begin{abstract}
+
+\end{abstract}
+
+\begin{keyword}
+
+\end{keyword}
+
+\maketitle
+
+
+\section{Introduction}
+
+\section{Literature Review}
+\label{sec:litrev}
+
+\section{Problem Definition}
+\label{sec:probdef}
+
+\section{MILP model}
+\label{sec:milp}
+
+\subsection{Sets}
+\begin{itemize}
+    \item $\mathcal{A}$ : Set of activities to be scheduled.
+    \item $\mathcal{L}$ : Set of skills.
+    \item $\mathcal{W}$ : Set of MS resources.
+    \item $\mathcal{CR}$ : Set of cumulative resources.
+    \item $\mathcal{T}$ : Time horizon, $\mathcal{T} = \{1, \dots, T\}$, indexed by $t$.
+    \item $E$ : Set of precedence constraints.
+\end{itemize}
+
+\subsection{Parameters}
+\begin{itemize}
+    \item $p_i$ : Processing time of activity $i$.
+    \item $B_k$ : Amount of resource $k$.
+    \item $b_{i,k}$ : Amount of resource $k$ required for executing activity $i$.
+    \item $a_{i,l}$ : Amount of workers mastering skill $l$ required for activity $i$.
+    \item $m_{w,l}$ : Equal to 1 if worker $w$ masters skill $l$, 0 otherwise.
+    \item $q_i$ : Minimum number of workers required for activity $i$.
+    \item $r_i, d_i$ : Release date and deadline allowed for activity $i$.
+\end{itemize}
+
+\subsection{Decision Variables}
+\begin{itemize}
+    \item $x_{i,t} \in \{0, 1\}$ : Equals 1 if activity $i$ is executed during time $t$, 0 otherwise.
+    \item $z_{w,i,l,t} \in \{0, 1\}$ : Equals 1 if worker $w$ is allocated to activity $i$ specifically to perform skill $l$ during time $t$, 0 otherwise.
+\end{itemize}
+
+\subsection{Objective Function}
+The objective is to minimize the total execution time of the project (\textit{Makespan}):
+\begin{equation}
+    \min \quad C_{\max}
+\end{equation}
+
+\subsection{Constraints}
+
+\noindent \textbf{Strict Uniqueness:} A worker can be assigned to a maximum of 1 activity AND 1 skill simultaneously at period $t$.
+\begin{equation}
+    \sum_{i \in \mathcal{A}} \sum_{l \in \mathcal{L}} z_{w,i,l,t} \leq 1 \quad \forall w \in \mathcal{W}, \forall t \in \mathcal{T}
+\end{equation}
+
+\noindent \textbf{Skill Mastery Validation:} The model can only allocate a worker to a skill if they actually possess that specific capability.
+\begin{equation}
+    z_{w,i,l,t} \leq m_{w,l} \quad \forall w \in \mathcal{W}, \forall i \in \mathcal{A}, \forall l \in \mathcal{L}, \forall t \in \mathcal{T}
+\end{equation}
+
+\noindent \textbf{Technical Skill Requirements Coverage:} If an activity is active ($x_{i,t} = 1$), the sum of workers explicitly performing skill $l$ must fulfill the requirement $a_{i,l}$.
+\begin{equation}
+    \sum_{w \in \mathcal{W}} z_{w,i,l,t} \geq a_{i,l} \cdot x_{i,t} \quad \forall l \in \mathcal{L}, \forall i \in \mathcal{A}, \forall t \in \mathcal{T}
+\end{equation}
+
+\noindent \textbf{Minimum Total Workforce Quota:} To count the total headcount on activity $i$ at period $t$, we sum all skill assignments for that activity. This total must satisfy the physical requirement $q_i$.
+\begin{equation}
+    \sum_{w \in \mathcal{W}} \sum_{l \in \mathcal{L}} z_{w,i,l,t} \geq q_i \cdot x_{i,t} \quad \forall i \in \mathcal{A}, \forall t \in \mathcal{T}
+\end{equation}
+
+\subsection{Scheduling Constraints}
+
+\noindent \textbf{Processing Duration Fulfillment:} Each activity must execute for exactly $p_i$ periods within its time window.
+\begin{equation}
+    \sum_{t=r_i}^{d_i} x_{i,t} = p_i \quad \forall i \in \mathcal{A}
+\end{equation}
+
+\noindent \textbf{Precedence Constraints:} A successor activity $j$ cannot start until its predecessor $i$ is fully completed.
+\begin{equation}
+    p_i \cdot (1 - x_{j,t}) \geq \sum_{t'=t}^T x_{i,t'} \quad \forall (i,j) \in E, \forall t \in \mathcal{T}
+\end{equation}
+
+\subsection{Material Constraints and Makespan Calculation}
+
+\noindent \textbf{Cumulative Material Resource Capacity:} Since tasks cannot be paused, material resource usage simplifies to a standard capacity constraint.
+\begin{equation}
+    \sum_{i \in \mathcal{A}} b_{i,k} \cdot x_{i,t} \leq B_k \quad \forall k \in \mathcal{CR}, \forall t \in \mathcal{T}
+\end{equation}
+
+\noindent \textbf{Makespan Lower Bound Definition:} 
+\begin{equation}
+    C_{\max} \geq t \cdot x_{i,t} \quad \forall i \in \mathcal{A}, \forall t \in \mathcal{T}
+\end{equation}
+
+\section{CP model}
+\label{sec:cp}
+
+\subsection{Sets}
+\begin{itemize}
+    \item $\mathcal{A}$ : Set of activities to be scheduled.
+    \item $\mathcal{L}$ : Set of skills.
+    \item $\mathcal{W}$ : Set of MS resources.
+    \item $\mathcal{CR}$ : Set of cumulative resources. 
+    \item $\mathcal{T}$ : Time horizon, $\mathcal{T} = \{1, \dots, T\}$, indexed by $t$.
+    \item $E$ : Set of precedence constraints.
+    \item $V_i$ : Set of unit-duration parts of activity $i$, $V_i = \{1, \dots, p_i\}$, indexed by $v$.
+\end{itemize}
+
+\subsection{Additional parameters}
+\begin{itemize}
+    \item $N_l$ : Total number of workers mastering skill $l$.
+\end{itemize}
+
+\subsection{Decision Variables}
+\begin{itemize}
+    \item $C_{\max} \ge 0$ : Integer variable related to the makespan.
+    \item $act_i$ : Interval variable of size $p_i$ representing the global processing of activity $i$.
+    \item $par_{i,v}$ : Interval variable of unit duration representing the processing of the $v$-th part of activity $i$.
+    \item $awo_{w,i,l,v} \in \{0, 1\}$ : Optional interval variable of unit duration representing the processing of the $v$-th part of activity $i$ by worker $w$ using skill $l$.
+    \item $wU$ : Cumulative function representing the sum of contributions of activities in worker usage.
+    \item $sU_l$ : Cumulative function representing the sum of contributions of activities in usage of skill $l$.
+\end{itemize}
+
+\subsection{Objective Function}
+The objective is to minimize the total execution time of the project (\textit{Makespan}):
+\begin{equation}
+    \min \quad C_{\max}
+\end{equation}
+
+\subsection{Constraints}
+
+\noindent \textbf{Makespan Lower Bound:} The total project duration cannot be smaller than the completion time of any global activity interval.
+\begin{equation}
+    C_{\max} \geq act_i.\text{end} \quad \forall i \in \mathcal{A}
+\end{equation}
+
+\noindent \textbf{Activity Components Span:} The global interval variable of each activity must perfectly cover all its underlying unit-duration components.
+\begin{equation}
+    \text{span}(act_i, \{par_{i,v} \mid v \in V_i\}) \quad \forall i \in \mathcal{A}
+\end{equation}
+
+\noindent \textbf{Strict Temporal Contiguity (Zero Interruptions):} To enforce non-preemption while maintaining allocation flexibility, the completion time of part $v$ must strictly equal the start time of part $v+1$.
+\begin{equation}
+    \text{startAtEnd}(par_{i,v+1}, par_{i,v}) \quad \forall i \in \mathcal{A}, \forall v \in \{1, \dots, p_i-1\}
+\end{equation}
+
+\noindent \textbf{Precedence Relations:} A successor activity $m$ cannot begin its execution block until its direct predecessor $i$ is completely finished.
+\begin{equation}
+    \text{endBeforeStart}(act_i, act_m) \quad \forall (i,m) \in E
+\end{equation}
+
+\noindent \textbf{Cumulative Material Resource Capacity:} Material requirements across concurrent global active intervals must never violate the capacity boundaries.
+\begin{equation}
+    \sum_{i \in \mathcal{A}} \text{pulse}(act_i, b_{i,k}) \leq B_k \quad \forall k \in \mathcal{CR}
+\end{equation}
+
+\noindent \textbf{Strict Worker Uniqueness:} A worker can never be multi-allocated across separate activities or deploy multiple skills concurrently.
+\begin{equation}
+    \text{noOverlap}(\{awo_{w,i,l,v} \mid \forall i \in \mathcal{A}, \forall l \in \mathcal{L}, \forall v \in V_i\}) \quad \forall w \in \mathcal{W}
+\end{equation}
+
+\noindent \textbf{Technical Skill Satisfaction:} For every unit-duration block, an alternative choice constraint aggregates qualified personnel to fulfill the specified skill demand.
+\begin{equation}
+    \text{alternative}(par_{i,v}, \{awo_{w,i,l,v} \mid \forall w \in \mathcal{W} \text{ s.t. } m_{w,l}=1\}, a_{i,l}) \quad \forall i \in \mathcal{A}, \forall v \in V_i, \forall l \in \mathcal{L}
+\end{equation}
+
+\noindent \textbf{Workforce Headcount Quota Coverage:} Individual allocations are grouped across all skills for each part $v$ to satisfy the physical operator minimum requirement.
+\begin{equation}
+    \text{alternative}(par_{i,v}, \{awo_{w,i,l,v} \mid \forall w \in \mathcal{W}, \forall l \in \mathcal{L}\}, q_i) \quad \forall i \in \mathcal{A}, \forall v \in V_i
+\end{equation}
+
+\noindent \textbf{Redundant Global Capacity Envelopes:} Redundant cumulative functions evaluate aggregated workload peaks over the timeline to enhance solver propagation speed.
+\begin{equation}
+    wU = \sum_{i \in \mathcal{A}} \text{pulse}(act_i, q_i)
+\end{equation}
+\begin{equation}
+    sU_l = \sum_{i \in \mathcal{A}} \text{pulse}(act_i, a_{i,l}) \quad \forall l \in \mathcal{L}
+\end{equation}
+\begin{equation}
+    wU \le |\mathcal{W}|
+\end{equation}
+\begin{equation}
+    sU_l \le N_l \quad \forall l \in \mathcal{L}
+\end{equation}
+
+\section{Benders Method}
+\label{sec:lbbd}
+
+\subsection{Master Problem: Scheduling}\label{master}
+
+The Master Problem is a relaxed version of the complete CP model presented in Section~\ref{sec:cp}. It focuses solely on the temporal scheduling of activities and ignores the detailed assignment of individual workers. To maintain feasibility, it relies on global cumulative capacity relaxations and is progressively tightened by Benders cuts generated by the subproblems.
+
+\subsubsection{Sets}
+\begin{itemize}
+    \item $\mathcal{A}$ : Set of activities to be scheduled.
+    \item $\mathcal{L}$ : Set of skills.
+    \item $\mathcal{W}$ : Set of MS resources.
+    \item $\mathcal{CR}$ : Set of cumulative resources.
+    \item $\mathcal{T}$ : Time horizon, $\mathcal{T} = \{1, \dots, T\}$, indexed by $t$.
+    \item $E$ : Set of precedence constraints.
+    \item $\Omega$ : Set of Benders cuts generated from the subproblems. Each cut $S \in \Omega$ represents a subset of conflicting skills.
+\end{itemize}
+
+\subsubsection{Parameters}
+\begin{itemize}
+    \item $p_i$ : Processing time (duration) of activity $i$.
+    \item $q_i$ : Minimum total number of workers required for activity $i$.
+    \item $a_{i,l}$ : Number of workers mastering skill $l$ required for activity $i$.
+    \item $b_{i,k}$ : Amount of cumulative resource $k$ required by activity $i$.
+    \item $B_k$ : Maximum capacity of cumulative resource $k$.
+    \item $N_l$ : Total number of workers mastering skill $l$.
+    \item $W_S$ : The subset of workers mastering at least one skill required by the tasks in set $S$.
+\end{itemize}
+
+\subsubsection{Decision Variables}
+\begin{itemize}
+    \item $C_{\max} \ge 0$ : Integer variable representing the project makespan.
+    \item $act_i$ : Interval variable for the global execution of activity $i$, of size $p_i$.
+\end{itemize}
+
+
+\subsubsection{Mathematical Formulation}
+\begin{align}
+    \min \quad & C_{\max} \label{mp_obj} \\
+    \text{s.t.} \quad & \nonumber \\
+    & C_{\max} \geq act_i.\text{end} & \forall i \in \mathcal{A} \label{mp_makespan} \\
+    & \text{endBeforeStart}(act_i, act_m) & \forall (i,m) \in E \label{mp_prec} \\
+    & \sum_{i \in \mathcal{A}} \text{pulse}(act_i, b_{i,k}) \leq B_k & \forall k \in \mathcal{CR} \label{mp_cumul} \\
+    &\sum_{i \in \mathcal{A}} \text{pulse}(act_i, q_i) \leq \lvert \mathcal{W} \rvert \label{mp_relax_w} \\
+    & \sum_{i \in \mathcal{A}}  \text{pulse}(act_i, a_{i,l}) \leq N_{l} & \forall l \in \mathcal{L} \label{mp_relax_s} 
+\end{align}
+
+Equations (\ref{mp_obj}) to (\ref{mp_relax_s}) enforce the standard scheduling constraints and global capacity relaxations. The specific Logic-Based Benders cuts are dynamically generated and injected into the model as described in Section \ref{sec:coupes}.
+
+
+\subsection{Subproblems: Assignment}\label{ssed:2.2}
+
+\subsubsection{MILP}
+Let $D_{l}$ be the demand for skill $l$ (for a given time period), and $m_{w,l} = 1$ if worker $w$ masters skill $l$ (0 otherwise).
+
+Variables: $x_{w,l} = 1$ if worker $w$ is assigned to skill $l$ (0 otherwise, with relaxed integrality).
+
+\begin{align}
+    \min \quad & 0 \\
+    \text{s.t.} \quad & \sum_{l\in \mathcal{L}} x_{w,l} \leq 1  && \forall w \in \mathcal{W} \label{sp_disj} \\
+    & \sum_{w \in \mathcal{W}} x_{w,l} \times m_{w,l} = D_{l} && \forall l \in \mathcal{L} \label{sp_demande}\\
+    & x_{w,l} \geq 0 && w \in \mathcal{W}, \forall l \in \mathcal{L}  
+\end{align}
+(\ref{sp_disj}) Exactly one assignment per worker.\\
+(\ref{sp_demande}) The skill demand is strictly satisfied.
+
+\subsubsection{Max-flow}
+\begin{align}
+    \max \quad & \sum_{l \in \mathcal{L}} f_{s,l} \\
+    \text{s.t.} \quad & f_{s,l}  \leq D_{l} && \forall l \in \mathcal{L} \\
+    & f_{s,l} - \sum_{w \in \mathcal{W}} f_{l,w} \times m_{w,l} = 0 && \forall l \in \mathcal{L} \\
+    & \sum_{l \in \mathcal{L}} f_{l,w} - f_{w,p} = 0 && \forall w \in \mathcal{W} \\
+    & f_{w,p} \leq 1  && \forall w \in \mathcal{W} 
+\end{align}
+
+
+\subsection{Benders Cuts} \label{sec:coupes}
+
+\subsubsection{Dual}
+\begin{align}
+    \max \quad & \sum_{w \in \mathcal{W}} u_w + \sum_{ l \in \mathcal{L}}( D_l \times v_l) \label{obj_dual} \\
+    \text{s.t.} \quad & u_w + m_{w,l} \times v_l \leq 0 && \forall w \in \mathcal{W}, \forall l \in \mathcal{L} \label{dual_cont}\\
+    & u_w \leq 0 && \label{dual_var}
+\end{align}
+
+If there exist $\Bar{u},\Bar{v}$ satisfying constraints (\ref{dual_cont}) and (\ref{dual_var}) such that $\sum_{w \in \mathcal{W}} \Bar{u}_w + \sum_{ l \in \mathcal{L}}( D_l \times \Bar{v}_l) > 0$, the subproblem is infeasible (by the Strong Duality Theorem and Farkas' Lemma).
+
+Let $S \subseteq \mathcal{L}$ be the subset of active skills identified as conflicting, and let $W_S$ be the subset of workers mastering at least one of the skills required by the tasks in $S$. 
+If $\Bar{u}_w = - 1 ~~\forall w \in \mathcal{W}_S$ and $\Bar{v}_l = 1 ~~ \forall l \in S$, then $|W_S| < \sum_{l \in S} D_l \Leftrightarrow  \Bar{u}_w + \sum_{ l \in \mathcal{L}}( D_l \times \Bar{v}_l) > 0 $.
+
+\subsubsection{Cut Formulation}
+When the subproblem is infeasible for a given partial schedule, we identify the minimal conflicting subset of tasks $\mathcal{A}_S$ and the corresponding set of saturated skills $S$. To prevent this infeasibility, we inject a dynamic cumulative constraint into the Master Problem:
+
+\begin{equation}
+    \sum_{i \in \mathcal{A}} \sum_{l \in S} \text{pulse}(act_{i}, a_{i,l}) \le |W_S| \label{eq:benders_cut}
+\end{equation}
+
+where $\mathcal{L}_w = \{ l \in \mathcal{L} \mid m_{w,l} = 1 \}$ is the set of skills mastered by worker $w$, and $W_S = \{w \in \mathcal{W} \mid \exists l \in S \cap \mathcal{L}_w\}$ is the subset of workers mastering at least one skill in $S$.
+
+
+\subsubsection{Min-cut}
+\begin{align}
+    \min \quad & \sum_{w \in \mathcal{W}} d_{w,p} + \sum_{ l \in \mathcal{L}}( D_l \times d_{s,l}) \label{obj_dual2} \\
+    \text{s.t.} \quad & d_{s,l}+p_{l} \geq 1 && \forall l \in \mathcal{L} \label{dsl}\\
+    & d_{w,p}+p_{w} \geq 0 && \forall w \in \mathcal{W} \label{dwp}\\
+    & p_{w} - m_{w,l} \times p_{l} \geq 0 && \forall l \in \mathcal{L},\forall w \in \mathcal{W}
+\end{align}
+
+For the subproblem to be feasible, the condition $\min \sum_{w \in \mathcal{W}} d_{w,p} + \sum_{ l \in \mathcal{L}}( D_l \times d_{s,l}) \geq \sum_{ l \in \mathcal{L}} D_l$ must hold. Otherwise, we add the corresponding cut: 
+$$ \sum_{w \in \mathcal{W}} d_{w,p} + \sum_{ l \in \mathcal{L}}( D_l \times d_{s,l}) \geq \sum_{ l \in \mathcal{L}} D_l \Rightarrow \sum_{w \in \mathcal{W}} d_{w,p}  \geq \sum_{ l \in \mathcal{L}} D_l (1 - d_{s,l}) \Rightarrow |V|  \geq \sum_{ l \in S} D_l $$
+where $S = \{ l \in \mathcal{L} \mid d_{s,l} = 0\}$ and $V = \{ w \in \mathcal{W} \mid d_{w,p} = 1\}$ (representing the sets of nodes $l$ and $w$ located on the source side $s$ of the minimum cut in the optimal dual solution).
+
+\section{Computational Experiments}                  \label{sec:compexp}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+
+
+
+\end{document}
+
+

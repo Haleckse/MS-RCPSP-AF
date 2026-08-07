@@ -1,0 +1,134 @@
+\section{Décomposition de Benders basée sur la logique}
+
+Ce chapitre présente la méthode de décomposition de Benders basée sur la Logique (LBBD, pour \textit{Logic-Based Benders Decomposition}). Cette approche sépare les décisions temporelles d'ordonnance\-ment (dates d'exécution des tâches) des décisions d'affectation (attribution des travailleurs à chaque période).
+
+\bigskip
+
+Afin de mieux introduire les fondements et les apports de la LBBD, rappelons brièvement le principe de la décomposition de Benders classique. Elle \cite{benders1962partitioning} partitionne les variables d'un problème en deux sous-ensembles résolus de manière itérative : un problème maître et un sous-problème. La version classique impose que le sous-problème soit un programme linéaire continu afin d'exploiter les variables duales pour construire des coupes d'optimalité ou de faisabilité. La décomposition de Benders basée sur la logique (LBBD) \cite{hooker2000logic, hooker2019logic} étend ce principe aux cas où le sous-problème contient des variables entières ou des structures combinatoires discrètes (résolu par programmation par contraintes ou algorithmes de graphes). Les coupes ne proviennent plus de la dualité linéaire continue, mais de conditions logiques formulées à partir de la preuve d'infaisabilité ou d'optimalité du sous-problème.
+
+\bigskip
+
+La LBBD est fréquemment appliquée aux problèmes couplant ordonnancement et allocation de ressources \cite{cire2016logic}. Dans le cas du MS-PSP, les premières approches utilisaient un schéma classique : un problème maître en MILP pour l'affectation globale et un sous-problème en CP pour l'ordonnancement temporel \cite{LiHaitao2009Spwm, li2015benders, nasirian2025multiskilled}. Pour améliorer la convergence, Yi-fan et al. \cite{yi2013new} ont proposé d'inverser cette structure en confiant l'ordonnancement à un problème maître CP et l'affectation au sous-problème. Récemment, Juvin et al. \cite{juvin2026logic} ont étendu ce schéma inverse au problème avec flexibilité d'affectation (MS-RCPSP-AF).
+
+
+\subsection{Principes de la Décomposition de Benders basée sur la Logique appliquée au MS-RCPSP-AF}
+
+La décomposition de benders basée sur la logique découple la planification des tâches de l'affecta\-tion nominative des opérateurs. La résolution repose sur une boucle itérative entre un problème maître et un sous-problème : le problème maître (formulé en CP) génère un ordonnancement minimisant le makespan sous une relaxation des ressources et l'ensemble des coupes déjà accumulées. Cet ordonnancement est ensuite transmis au sous-problème, qui évalue de façon indépendante à chaque période si la polyvalence des travailleurs permet de couvrir les exigences en compétences (modélisé par un graphe biparti et résolu par flot maximum). Si l'affectation est réalisable, la solution est immédiatement prouvée optimale : d'une part, le problème maître garantit que le makespan obtenu est minimal parmi tous les ordonnancements compatibles avec les coupes accumulées ; d'autre part, le sous-problème confirme l'existence d'une affectation valide des travailleurs pour cet ordonnancement, en fournissant une assignation concrète des travailleurs à chaque période. L'algorithme s'arrête alors. En cas d'infaisabilité, le sous-problème identifie la sous-structure critique responsable du conflit d'affectation et génère une coupe combinatoire réinjectée dans le problème maître pour éliminer cette configuration lors des itérations futures.
+
+\smallskip
+\noindent Pour résumer, la décomposition s'articule ainsi :
+\begin{itemize}
+    \item \textbf{Le problème maître (CP) :} Il planifie les activités sur un horizon temporel continu en respectant les contraintes de précédences, les contraintes de capacité cumulatives de main-d'œuvre globales ainsi que les coupes accumulées. Il ignore l'affectation nominative des travailleurs, mais fournit un ordonnancement global des tâches.
+    \item \textbf{Le sous-problème d'affectation (Flot Max) :} Pour un ordonnancement fixé par le problème maître, il vérifie de manière indépendante pour chaque période $t$ s'il existe une affectation valide des travailleurs pour couvrir les besoins en compétences des activités actives. En cas d'infaisabilité, les coupes logiques générées correspondent à des ensembles critiques ou interdits (\textit{forbidden sets}) \cite{lombardi2012min, stork2005generation}.
+\end{itemize}
+
+\subsection{Problème maître (Ordonnancement)}
+Le problème maître est une version relaxée du premier modèle CP monolithique présenté au Chapitre 2. Il se concentre sur l'aspect temporel de l'ordonnancement global des tâches. Il ignore l'affectation nominative des opérateurs, mais intègre des contraintes de capacité cumulative globale (enveloppes de main-d'œuvre) pour éviter de générer des plannings manifestement irréalisables.
+
+\subsubsection{Formulation mathématique}
+Soit $\Omega$ l'ensemble des coupes de Benders générées et injectées dynamiquement au cours des itérations. Le problème maître s'exprime sous la forme du modèle CP suivant :
+
+\begin{align}
+    \min \quad & C_{\max} \label{mp_obj} \\
+    \text{s.t.} \quad & \nonumber \\
+    & C_{\max} \geq act_i.\text{end} && \forall i \in \mathcal{A} \label{mp_makespan} \\
+    & \text{endBeforeStart}(act_i, act_m) && \forall (i,m) \in E \label{mp_prec} \\
+    & \sum_{i \in \mathcal{A}} \text{pulse}(act_i, b_{i,k}) \leq B_k && \forall k \in \mathcal{CR} \label{mp_cumul} \\
+    & \sum_{i \in \mathcal{A}} \text{pulse}(act_i, q_i) \leq \lvert \mathcal{W} \rvert \label{mp_relax_w} \\
+    & \sum_{i \in \mathcal{A}}  \text{pulse}(act_i, a_{i,l}) \leq N_{l} && \forall l \in \mathcal{L} \label{mp_relax_s} \\
+    & \Omega \label{mp_cuts}
+\end{align}
+
+Les équations (\ref{mp_makespan}) à (\ref{mp_relax_s}) correspondent aux contraintes d'ordonnancement et aux contraintes cumulatives globales (le besoin en effectif total ne doit pas dépasser le nombre d'opérateurs $|\mathcal{W}|$, et la demande cumulée par compétence ne doit pas dépasser le nombre d'opérateurs qualifiés $N_l$). La contrainte (\ref{mp_cuts}) représente les coupes générées par les sous-problèmes d'affectation pour interdire les conflits de compétences détectés.
+
+\subsection{Sous-problème d'affectation}
+À chaque itération, le solveur résout le problème maître et obtient un ordonnancement partiel où les dates de début et de fin de chaque activité globale $act_i$ sont fixées. À partir de cet ordonnancement, nous déterminons pour chaque période $t \in \mathcal{T}$ l'ensemble des activités actives :
+\begin{equation}
+    \mathcal{A}(t) = \{ i \in \mathcal{A} \mid act_i.\text{start} \le t < act_i.\text{end} \}
+\end{equation}
+
+Pour chaque période $t$, la demande totale pour la compétence $l$, notée $D_l(t)$, est la somme des besoins des tâches actives à cet instant :
+\begin{equation}
+    D_l(t) = \sum_{i \in \mathcal{A}(t)} a_{i,l} \quad \forall l \in \mathcal{L}
+\end{equation}
+
+La validation de la faisabilité consiste à vérifier s'il existe, pour chaque période $t$, une affectation des travailleurs $w \in \mathcal{W}$ aux compétences $l \in \mathcal{L}$ telle que la demande $D_l(t)$ soit satisfaite pour toute compétence et que chaque travailleur ne soit affecté qu'au plus à une seule compétence.
+
+Pour modéliser ce sous-problème d'affectation à chaque période $t$, deux approches sont envisageables. La première consiste à formuler un programme linéaire de décision de faisabilité en relâchant les contraintes d'intégralité binaire sur les variables d'affectation. Soit $x_{w,l} \ge 0$ la variable de décision continue représentant la fraction de temps que le travailleur $w$ consacre à la compétence $l$ durant la période $t$. Le problème se formule ainsi :
+\begin{align}
+    \min \quad & 0 \label{pl_sub_obj} \\
+    \text{s.t.} \quad & \sum_{l \in \mathcal{L}} x_{w,l} \leq 1 && \forall w \in \mathcal{W} \label{pl_sub_disj} \\
+    & \sum_{w \in \mathcal{W}} x_{w,l} \cdot m_{w,l} = D_l(t) && \forall l \in \mathcal{L} \label{pl_sub_demand} \\
+    & x_{w,l} \geq 0 && \forall w \in \mathcal{W}, \forall l \in \mathcal{L}
+\end{align}
+La contrainte (\ref{pl_sub_disj}) garantit qu'un travailleur n'est pas affecté au-delà de sa capacité temporelle unitaire, tandis que la contrainte (\ref{pl_sub_demand}) assure la satisfaction exacte de la demande en compétences requise. L'objectif est simplement de trouver une solution admissible (coût nul).
+
+\bigskip
+
+Pour éviter d'appeler un solveur de programmation linéaire générique (simplexe ou points intérieurs) à chaque étape de la recherche, nous utilisons plutôt la seconde approche : la modélisation sous forme de flot maximum dans un réseau biparti. Ce formalisme permet d'appliquer des algorithmes de graphes spécialisés plus rapides.
+
+\subsubsection{Formulation sous forme de flot maximum (Max-Flow)}
+Puisque les périodes sont indépendantes une fois le temps fixé, le problème d'affectation pour une période $t$ peut être modélisé comme un problème de flot maximum dans un réseau de transport biparti.
+
+\bigskip
+
+Nous construisons un graphe orienté $G(V, A)$ composé de :
+\begin{itemize}
+    \item Une source $s$ et un puits $p$.
+    \item Un nœud pour chaque travailleur $w \in \mathcal{W}$.
+    \item Un nœud pour chaque couple tâche-compétence $(i, l)$ actif à l'instant $t$.
+\end{itemize}
+
+Les arcs et leurs capacités associées sont définis comme suit :
+\begin{itemize}
+    \item Un arc orienté de la source $s$ vers chaque nœud de travailleur $w$ avec une capacité unitaire (1), garantissant qu'un travailleur ne peut effectuer qu'une tâche à la fois.
+    \item Un arc orienté de chaque nœud de travailleur $w$ vers chaque nœud de tâche-compétence $(i, l)$ si et seulement si le travailleur maîtrise la compétence requise ($m_{w,l} = 1$). La capacité de cet arc est infinie.
+    \item Un arc orienté de chaque nœud de tâche-compétence $(i, l)$ vers le puits $p$ avec une capacité égale à la demande requise $a_{i,l}$.
+\end{itemize}
+
+Le problème de flot maximum peut se formuler comme un programme linéaire :
+\begin{align}
+    \max \quad & \sum_{w \in \mathcal{W}} f_{s,w} \label{flow_obj} \\
+    \text{s.t.} \quad & f_{s,w} \leq 1 && \forall w \in \mathcal{W} \label{flow_c1} \\
+    & f_{s,w} - \sum_{\substack{i \in \mathcal{A}(t) \\ l \in \mathcal{L}}} f_{w,(i,l)} = 0 && \forall w \in \mathcal{W} \label{flow_c2} \\
+    & \sum_{\substack{w \in \mathcal{W} \\ m_{w,l} = 1}} f_{w,(i,l)} - f_{(i,l),p} = 0 && \forall i \in \mathcal{A}(t),\ \forall l \in \mathcal{L} \label{flow_c3} \\
+    & f_{(i,l),p} \leq a_{i,l} && \forall i \in \mathcal{A}(t),\ \forall l \in \mathcal{L} \label{flow_c4} \\
+    & f \geq 0
+\end{align}
+
+La contrainte~(\ref{flow_c1}) borne le flot sortant de la source à 1 par travailleur, garantissant qu'un travailleur ne peut être mobilisé que pour une seule compétence à la fois. Les contraintes~(\ref{flow_c2}) et~(\ref{flow_c3}) assurent la conservation du flot respectivement aux nœuds travailleurs et aux nœuds tâche-compétence. Enfin, la contrainte~(\ref{flow_c4}) borne le flot entrant au puits par la demande $a_{i,l}$ de chaque couple actif.
+
+\bigskip
+
+Si la valeur du flot maximum est strictement inférieure à la demande totale $\sum_{l \in \mathcal{L}} D_l(t)$, alors l'affectation est irréalisable à l'instant $t$. Le solveur doit alors générer une coupe de Benders pour exclure cet ordonnancement.
+
+\subsection{Génération des coupes de Benders}
+Lorsqu'une infaisabilité est détectée à une période $t$, c'est-à-dire lorsque le flot maximum calculé est strictement inférieur à la demande totale $\sum_{l \in \mathcal{L}} D_l(t)$, il est nécessaire d'en identifier la cause structurelle avant de pouvoir faire progresser le problème maître. Cette infaisabilité ne signifie pas que le problème global est sans solution : elle indique uniquement que l'ordonnancement proposé par le problème maître crée, à cet instant $t$, une surcharge localisée sur un sous-ensemble de compétences que la main-d'œuvre disponible ne peut satisfaire.
+
+Pour exploiter cette information, nous identifions le sous-ensemble critique de compétences à l'origine du conflit à l'aide d'une coupe minimale extraite du graphe biparti. Ce sous-ensemble est ensuite traduit en une contrainte cumulative globale, appelée coupe de Benders, que l'on réinjecte dans le problème maître afin d'interdire toute configuration d'ordonnancement reproduisant ce conflit lors des itérations futures.
+
+\subsubsection{Recherche de coupe minimale sur le graphe biparti}
+
+Nous exploitons directement le théorème du flot maximum / coupe minimale (\textit{Max-Flow / Min-Cut}) \cite{ford1956maximal} sur le réseau biparti orienté construit avec la bibliothèque \texttt{NetworkX}. Ce théorème établit que, dans tout réseau de flot, la valeur du flot maximum entre une source et un puits est égale à la capacité de la coupe minimale séparant ces deux nœuds. De plus, la partition obtenue identifie le sous-ensemble de compétences le plus petit possible à l'origine de l'infaisabilité.
+
+Lorsqu'à une période $t$, le flot maximum calculé est strictement inférieur à la demande totale ($\text{FlotMax} < \sum_{l \in \mathcal{L}} D_l(t)$), la coupe minimale partitionne les nœuds du graphe en deux sous-ensembles disjoints : la partie atteignable (notée $S_{\text{att}}$, contenant la source $s$) et la partie non atteignable (notée $T_{\text{non-att}}$, contenant le puits $p$).
+
+Soit $S \subseteq \mathcal{L}$ le sous-ensemble des compétences situées dans la partie non atteignable ($T_{\text{non-att}}$). La capacité de la coupe minimale est donnée par la somme des capacités des arcs coupés :
+\begin{equation}
+    \text{Capacite}(S_{\text{att}}, T_{\text{non-att}}) = |W_S| + \sum_{l \notin S} D_l(t)
+\end{equation}
+où $W_S \subseteq \mathcal{W}$ représente l'ensemble des travailleurs situés dans la partie non atteignable ($T_{\text{non-att}}$), c'est-à-dire les travailleurs capables d'exercer au moins une compétence de $S$. En effet, aucun travailleur de $S_{\text{att}}$ ne peut maîtriser une compétence de $S$ : un tel arc $w \to (i,l)$ traverserait la coupe avec une capacité infinie, ce qui est impossible pour une coupe minimale finie.
+
+L'infaisabilité de l'affectation à l'instant $t$ implique que la capacité de cette coupe est strictement inférieure à la demande totale exigée par les tâches actives :
+\begin{equation}
+    |W_S| + \sum_{l \notin S} D_l(t) < \sum_{l \in \mathcal{L}} D_l(t) \quad \implies \quad |W_S| < \sum_{l \in S} D_l(t)
+\end{equation}
+
+Cette inégalité isole le goulet d'étranglement : le nombre de travailleurs $|W_S|$ maîtrisant les compétences du sous-ensemble $S$ est strictement insuffisant pour couvrir la demande $\sum_{l \in S} D_l(t)$ requise à l'instant $t$.
+
+\subsubsection{Formulation de la coupe injectée}
+Pour interdire cette situation dans le problème maître, nous injectons la contrainte cumulative suivante :
+\begin{equation}
+    \sum_{i \in \mathcal{A}} \sum_{l \in S} \text{pulse}(act_i, a_{i,l}) \leq |W_S|
+\end{equation}
+Cette coupe indique que la somme des demandes en compétences appartenant à $S$ pour toutes les activités s'exécutant simultanément ne doit pas dépasser le nombre de travailleurs qualifiés $|W_S|$. Cette contrainte est formulée sous forme de fonctions cumulatives et de propagateurs temporels, ce qui permet au problème maître de décaler dans le temps certaines activités en conflit lors de la recherche.
