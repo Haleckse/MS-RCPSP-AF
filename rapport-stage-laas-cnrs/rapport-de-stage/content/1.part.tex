@@ -1,6 +1,6 @@
 \section{Programmation linéaire en nombres entiers}
 
-La Programmation Linéaire en Nombres Entiers (PLNE, ou MILP en anglais) est un outil d'optimisation classique en Recherche Opérationnelle pour résoudre les problèmes de décision complexes. La MILP permet de modéliser des problèmes NP-difficiles \cite{karp2010reducibility} en combinant une formulation mathématique avec la puissance des solveurs numériques \cite{papadimitriou1998combinatorial}.
+La Programmation Linéaire en Nombres Entiers (PLNE, ou MILP en anglais) est un outil d'optimi\-sation classique en Recherche Opérationnelle pour résoudre les problèmes de décision complexes. La MILP permet de modéliser des problèmes NP-difficiles \cite{karp2010reducibility} en combinant une formulation mathématique avec la puissance des solveurs numériques \cite{papadimitriou1998combinatorial}.
 
 \bigskip
 
@@ -39,7 +39,7 @@ Branching : Si une variable devant être entière prend une valeur fractionnaire
 
 \bigskip
 
-L'élagage (Bounding and Pruning) : L'arbre est exploré de manière itérative. Si la borne continue calculée à un nœud est moins bonne qu'une solution entière déjà connue (la borne supérieure), le solveur coupe ce nœud et sa descendance pour éviter une recherche inutile.
+L'élagage (Bounding and Pruning) : L'arbre est exploré de manière itérative. Si la borne continue calculée à un nœud est moins bonne qu'une solution entière déjà connue (par exemple plus grand que la borne supérieure pour un problème de minimisation), le solveur coupe ce nœud et sa descendance pour éviter une recherche inutile.
 
 \subsection{Application au MS-RCPSP-AF}
 
@@ -81,7 +81,7 @@ L'objectif est de minimiser la durée totale d'exécution du projet (\textit{Mak
 
 \subsubsection{Contraintes}
 
-\noindent \textbf{Unicité d'affectation :} Un travailleur peut être affecté au maximum à une seule activité et seulement une seule compétence ne peut etre utilisée à un instant $t$.
+\noindent \textbf{Unicité d'affectation :} Un travailleur peut être affecté au maximum à une seule activité et une seule compétence peut être utilisée à un instant $t$.
 \begin{equation}
     \sum_{i \in \mathcal{A}} \sum_{l \in \mathcal{L}} z_{w,i,l,t} \leq 1 \quad \forall w \in \mathcal{W}, \forall t \in \mathcal{T} \label{ilp_unicity}
 \end{equation}

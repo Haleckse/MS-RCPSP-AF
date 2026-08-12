@@ -2,57 +2,63 @@
 \contentsline {subsection}{Contexte et présentation du LAAS-CNRS}{1}{section*.3}%
 \contentsline {subsection}{Énoncé du problème et objectifs du stage}{2}{section*.4}%
 \contentsline {subsection}{Annonce du plan}{4}{section*.5}%
-\contentsline {section}{\numberline {1}Programmation linéaire en nombres entiers}{5}{section.1}%
-\contentsline {subsection}{\numberline {1.1}Structure d'un modèle MILP}{5}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}Mécanismes de résolution}{5}{subsection.1.2}%
-\contentsline {subsection}{\numberline {1.3}Application au MS-RCPSP-AF}{6}{subsection.1.3}%
-\contentsline {subsubsection}{\numberline {1.3.1}Ensembles}{6}{subsubsection.1.3.1}%
-\contentsline {subsubsection}{\numberline {1.3.2}Paramètres}{6}{subsubsection.1.3.2}%
-\contentsline {subsubsection}{\numberline {1.3.3}Variables de décision}{6}{subsubsection.1.3.3}%
-\contentsline {subsubsection}{\numberline {1.3.4}Fonction objectif}{6}{subsubsection.1.3.4}%
-\contentsline {subsubsection}{\numberline {1.3.5}Contraintes}{7}{subsubsection.1.3.5}%
-\contentsline {subsection}{\numberline {1.4}Limites de la formulation MILP}{7}{subsection.1.4}%
-\contentsline {subsubsection}{\numberline {1.4.1}Explosion du nombre de variables avec l'horizon temporel}{8}{subsubsection.1.4.1}%
-\contentsline {subsubsection}{\numberline {1.4.2}Faiblesse de la relaxation continue}{8}{subsubsection.1.4.2}%
-\contentsline {subsubsection}{\numberline {1.4.3}Linéarisation des relations logiques}{8}{subsubsection.1.4.3}%
-\contentsline {section}{\numberline {2}Programmation par Contraintes}{9}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Formalisme des Problèmes de Satisfaction de Contraintes (CSP)}{9}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}Mécanismes de résolution : Propagation et Recherche}{9}{subsection.2.2}%
-\contentsline {subsection}{\numberline {2.3}Primitives d'ordonnancement de CP Optimizer}{10}{subsection.2.3}%
-\contentsline {subsubsection}{\numberline {2.3.1}Variables d'intervalles (Interval Variables)}{10}{subsubsection.2.3.1}%
-\contentsline {subsubsection}{\numberline {2.3.2}Contraintes temporelles}{10}{subsubsection.2.3.2}%
-\contentsline {subsubsection}{\numberline {2.3.3}Ressources disjonctives et cumulatives}{10}{subsubsection.2.3.3}%
-\contentsline {subsection}{\numberline {2.4}Modélisation CP monolithique pour le MS-RCPSP-AF}{11}{subsection.2.4}%
-\contentsline {subsubsection}{\numberline {2.4.1}Ensembles et paramètres}{11}{subsubsection.2.4.1}%
-\contentsline {subsubsection}{\numberline {2.4.2}Variables de décision}{11}{subsubsection.2.4.2}%
-\contentsline {subsubsection}{\numberline {2.4.3}Formulation mathématique}{11}{subsubsection.2.4.3}%
-\contentsline {subsubsection}{\numberline {2.4.4}Explication des contraintes}{12}{subsubsection.2.4.4}%
-\contentsline {subsubsection}{\numberline {2.4.5}Contraintes redondantes de capacité globale}{12}{subsubsection.2.4.5}%
-\contentsline {subsection}{\numberline {2.5}Variante : Modélisation par Contrainte de Cardinalité Globale (GCC)}{12}{subsection.2.5}%
-\contentsline {subsubsection}{\numberline {2.5.1}Variables de décision du modèle GCC}{13}{subsubsection.2.5.1}%
-\contentsline {subsubsection}{\numberline {2.5.2}Formulation du modèle GCC et contraintes d'affectation}{13}{subsubsection.2.5.2}%
-\contentsline {subsection}{\numberline {2.6}Contraintes de bris de symétrie}{14}{subsection.2.6}%
-\contentsline {subsection}{\numberline {2.7}Limites des modèles CP monolithiques}{14}{subsection.2.7}%
-\contentsline {subsubsection}{\numberline {2.7.1}Explosion dimensionnelle du nombre de variables}{14}{subsubsection.2.7.1}%
-\contentsline {subsubsection}{\numberline {2.7.2}Perte de la structure globale d'ordonnancement et faiblesse de la propagation}{15}{subsubsection.2.7.2}%
-\contentsline {subsubsection}{\numberline {2.7.3}Symétries et inefficacité des contraintes de bris de symétrie}{15}{subsubsection.2.7.3}%
-\contentsline {section}{\numberline {3}Décomposition de Benders basée sur la logique}{16}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Principes de la Décomposition de Benders basée sur la Logique appliquée au MS-RCPSP-AF}{16}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}Problème maître (Ordonnancement)}{17}{subsection.3.2}%
-\contentsline {subsubsection}{\numberline {3.2.1}Formulation mathématique}{17}{subsubsection.3.2.1}%
-\contentsline {subsection}{\numberline {3.3}Sous-problème d'affectation}{17}{subsection.3.3}%
-\contentsline {subsubsection}{\numberline {3.3.1}Formulation sous forme de flot maximum (Max-Flow)}{18}{subsubsection.3.3.1}%
-\contentsline {subsection}{\numberline {3.4}Génération des coupes de Benders}{19}{subsection.3.4}%
-\contentsline {subsubsection}{\numberline {3.4.1}Recherche de coupe minimale sur le graphe biparti}{19}{subsubsection.3.4.1}%
-\contentsline {subsubsection}{\numberline {3.4.2}Formulation de la coupe injectée}{20}{subsubsection.3.4.2}%
-\contentsline {section}{\numberline {4}Évaluation Expérimentale}{21}{section.4}%
-\contentsline {subsection}{\numberline {4.1}Protocole expérimental et instances de test}{21}{subsection.4.1}%
-\contentsline {subsubsection}{\numberline {4.1.1}Environnement de test}{21}{subsubsection.4.1.1}%
-\contentsline {subsubsection}{\numberline {4.1.2}Premier jeu de données : Set 1a de la bibliothèque MSPSP-InstLib}{21}{subsubsection.4.1.2}%
-\contentsline {subsubsection}{\numberline {4.1.3}Autre jeu de données : Subset 1 de MSLIB}{21}{subsubsection.4.1.3}%
-\contentsline {paragraph}{Construction des sous-ensembles (Subsets) :}{22}{section*.6}%
-\contentsline {subsection}{\numberline {4.2}Comparaison des approches sur le Set 1a de MSPSP-InstLib}{22}{subsection.4.2}%
-\contentsline {subsubsection}{\numberline {4.2.1}Analyse des taux de résolution et des temps de calcul}{22}{subsubsection.4.2.1}%
-\contentsline {subsubsection}{\numberline {4.2.2}Comparaison directe sur les instances faciles (communes)}{23}{subsubsection.4.2.2}%
-\contentsline {subsection}{\numberline {4.3}Visualisations graphiques pour le Set 1a}{23}{subsection.4.3}%
-\contentsline {section}{Conclusion et Perspectives}{24}{section*.7}%
+\contentsline {section}{\numberline {1}Programmation linéaire en nombres entiers}{6}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Structure d'un modèle MILP}{6}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Mécanismes de résolution}{6}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Application au MS-RCPSP-AF}{7}{subsection.1.3}%
+\contentsline {subsubsection}{\numberline {1.3.1}Ensembles}{7}{subsubsection.1.3.1}%
+\contentsline {subsubsection}{\numberline {1.3.2}Paramètres}{7}{subsubsection.1.3.2}%
+\contentsline {subsubsection}{\numberline {1.3.3}Variables de décision}{8}{subsubsection.1.3.3}%
+\contentsline {subsubsection}{\numberline {1.3.4}Fonction objectif}{8}{subsubsection.1.3.4}%
+\contentsline {subsubsection}{\numberline {1.3.5}Contraintes}{8}{subsubsection.1.3.5}%
+\contentsline {subsection}{\numberline {1.4}Limites de la formulation MILP}{9}{subsection.1.4}%
+\contentsline {subsubsection}{\numberline {1.4.1}Explosion du nombre de variables avec l'horizon temporel}{9}{subsubsection.1.4.1}%
+\contentsline {subsubsection}{\numberline {1.4.2}Faiblesse de la relaxation continue}{9}{subsubsection.1.4.2}%
+\contentsline {subsubsection}{\numberline {1.4.3}Linéarisation des relations logiques}{9}{subsubsection.1.4.3}%
+\contentsline {section}{\numberline {2}Programmation par Contraintes}{11}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Formalisme des Problèmes de Satisfaction de Contraintes (CSP)}{11}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Mécanismes de résolution : Propagation et Recherche}{12}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Primitives d'ordonnancement de CP Optimizer}{12}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}Variables d'intervalles (Interval Variables)}{12}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}Contraintes temporelles}{12}{subsubsection.2.3.2}%
+\contentsline {subsubsection}{\numberline {2.3.3}Ressources disjonctives et cumulatives}{13}{subsubsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.4}Modélisation CP monolithique pour le MS-RCPSP-AF}{13}{subsection.2.4}%
+\contentsline {subsubsection}{\numberline {2.4.1}Ensembles et paramètres}{13}{subsubsection.2.4.1}%
+\contentsline {subsubsection}{\numberline {2.4.2}Variables de décision}{13}{subsubsection.2.4.2}%
+\contentsline {subsubsection}{\numberline {2.4.3}Formulation mathématique}{14}{subsubsection.2.4.3}%
+\contentsline {subsubsection}{\numberline {2.4.4}Explication des contraintes}{14}{subsubsection.2.4.4}%
+\contentsline {subsubsection}{\numberline {2.4.5}Contraintes redondantes de capacité globale}{15}{subsubsection.2.4.5}%
+\contentsline {subsection}{\numberline {2.5}Variante : Modélisation par Contrainte de Cardinalité Globale (GCC)}{15}{subsection.2.5}%
+\contentsline {subsubsection}{\numberline {2.5.1}Variables de décision du modèle GCC}{15}{subsubsection.2.5.1}%
+\contentsline {subsubsection}{\numberline {2.5.2}Formulation du modèle GCC et contraintes d'affectation}{16}{subsubsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.6}Contraintes de bris de symétrie}{16}{subsection.2.6}%
+\contentsline {subsection}{\numberline {2.7}Limites des modèles CP monolithiques}{17}{subsection.2.7}%
+\contentsline {subsubsection}{\numberline {2.7.1}Explosion dimensionnelle du nombre de variables}{17}{subsubsection.2.7.1}%
+\contentsline {subsubsection}{\numberline {2.7.2}Perte de la structure globale d'ordonnancement et faiblesse de la propagation}{18}{subsubsection.2.7.2}%
+\contentsline {subsubsection}{\numberline {2.7.3}Symétries et inefficacité des contraintes de bris de symétrie}{18}{subsubsection.2.7.3}%
+\contentsline {section}{\numberline {3}Décomposition de Benders basée sur la logique}{19}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Principes de la Décomposition de Benders basée sur la Logique appliquée au MS-RCPSP-AF}{19}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Problème maître (Ordonnancement)}{20}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}Formulation mathématique}{20}{subsubsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.3}Sous-problème d'affectation}{21}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}Formulation sous forme de flot maximum (Max-Flow)}{21}{subsubsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.4}Génération des coupes de Benders}{22}{subsection.3.4}%
+\contentsline {subsubsection}{\numberline {3.4.1}Recherche de coupe minimale sur le graphe biparti}{23}{subsubsection.3.4.1}%
+\contentsline {subsubsection}{\numberline {3.4.2}Formulation de la coupe injectée}{24}{subsubsection.3.4.2}%
+\contentsline {section}{\numberline {4}Évaluation Expérimentale}{25}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Protocole expérimental et instances de test}{25}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}Environnement de test}{25}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}Premier jeu de données : Set 1a de la bibliothèque MSPSP-InstLib}{25}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4.1.3}Autre jeu de données : Subset 1 de MSLIB}{26}{subsubsection.4.1.3}%
+\contentsline {paragraph}{Construction des sous-ensembles (Subsets) :}{26}{section*.6}%
+\contentsline {subsection}{\numberline {4.2}Comparaison des approches sur le Set 1a de MSPSP-InstLib}{26}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}Analyse des taux de résolution et des temps de calcul}{27}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}Comparaison directe sur les instances faciles (communes)}{27}{subsubsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.3}Visualisations graphiques pour le Set 1a}{28}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}Impact du nombre de travailleurs sur les performances de résolution}{28}{subsubsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.4}Résultats et comparaison sur le Subset 1 de MSLIB1}{29}{subsection.4.4}%
+\contentsline {subsubsection}{\numberline {4.4.1}Analyse des taux de résolution et des temps de calcul}{30}{subsubsection.4.4.1}%
+\contentsline {subsubsection}{\numberline {4.4.2}Comparaison directe sur les instances faciles (communes)}{30}{subsubsection.4.4.2}%
+\contentsline {subsubsection}{\numberline {4.4.3}Comparaison du comportement MSLIB vs Set 1a}{30}{subsubsection.4.4.3}%
+\contentsline {subsection}{\numberline {4.5}Visualisations graphiques pour le Subset 1}{31}{subsection.4.5}%
+\contentsline {section}{Conclusion et Perspectives}{32}{section*.7}%

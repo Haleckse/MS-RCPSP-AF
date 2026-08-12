@@ -8,11 +8,11 @@ En CP, l'utilisateur formule le problème sous forme de contraintes, et le proce
 
 \bigskip
 
-L'application de la CP au problème de l'ordonnancement de projet multi-compétences (MS-PSP) qui n'est autre que la version sans contraintes de ressources cumulatives du MS-RCPSP a donné lieu à des travaux notables. Des approches basées sur CP/SAT, le \textit{lazy clause generation} et l'apprentissage de no-goods ont été développées par Young et al. \cite{young2017constraint}. Pour le MS-RCPSP avec préemption et contraintes de ressources, Polo-Mejía et al. \cite{polo2020mixed, polo2023heuristic} ont proposé des modèles en CP exploitant les variables d'intervalles de solveurs comme \textit{IBM ILOG CP Optimizer}. Par ailleurs, des travaux comme ceux de Carlier et Néron \cite{carlier2007computing} ou de Baptiste et Bonifas \cite{baptiste2018redundant} ont montré l'intérêt d'ajouter des enveloppes cumulatives redondantes pour accélérer la convergence.
+L'application de la CP au problème de l'ordonnancement de projet multi-compétences (MSPSP) qui n'est autre que la version sans contraintes de ressources cumulatives du MS-RCPSP, a donné lieu à des travaux notables. Des approches basées sur CP/SAT, le \textit{lazy clause generation} et l'apprentissage de no-goods ont été développées par Young et al. \cite{young2017constraint}. Pour le MS-RCPSP avec préemption et contraintes de ressources, Polo-Mejía et al. \cite{polo2020mixed, polo2023heuristic} ont proposé des modèles en CP exploitant les variables d'intervalles de solveurs comme \textit{IBM ILOG CP Optimizer}. Par ailleurs, des travaux comme ceux de Carlier et Néron \cite{carlier2007computing} ou de Baptiste et Bonifas \cite{baptiste2018redundant} ont montré l'intérêt d'ajouter des enveloppes cumulatives redondantes pour accélérer la convergence.
 
 \bigskip
 
-Ce chapitre présente le formalisme général des CSP, décrit les primitives d'ordonnancement de CP Optimizer, formule les modèles CP monolithique pour le MS-RCPSP-AF, puis analyse ses limites combinatoires.
+Ce chapitre présente le formalisme général des CSP, décrit les primitives d'ordonnancement de CP Optimizer, formule les modèles CP monolithiques pour le MS-RCPSP-AF, puis analyse ses limites combinatoires.
 
 \subsection{Formalisme des Problèmes de Satisfaction de Contraintes (CSP)}
 Un CSP est défini par un triplet $(X, D, C)$ où :
@@ -183,7 +183,7 @@ où $values = [0, 1, 2, \dots, |\mathcal{L}|]$ désigne les valeurs d'affectatio
 
 
 \subsection{Contraintes de bris de symétrie}
-Ces formulations monolithique en CP présentent des symétries de permutation. Si plusieurs travailleurs possèdent les mêmes compétences, les solutions consistant à permuter ces travailleurs sur des tâches identiques sont équivalentes pour le makespan, mais obligent le solveur à explorer des branches inutilement.
+Ces formulations monolithiques en CP présentent des symétries de permutation. Si plusieurs travailleurs possèdent les mêmes compétences, les solutions consistant à permuter ces travailleurs sur des tâches identiques sont équivalentes pour le makespan, mais obligent le solveur à explorer des branches inutilement.
 
 \bigskip
 
@@ -196,7 +196,7 @@ La contrainte s'exprime ainsi :
     \text{IloIfThen}( PaS - \text{pulse}(par_{i,v},1) \leq -1 , awo_{w,i,l,v} = awo_{w,i,l,v-1}  ) \quad \forall l \in \mathcal{L},\forall w \in \mathcal{W}, \forall i \in \mathcal{A}, \forall v \in V_i \setminus\{0\} \label{cp_sym_break}
 \end{equation}
 
-\noindent Avec :
+\noindent avec :
 \begin{equation}
      PaS = \sum_{i \in \mathcal{A}}\text{pulse}(par_{i,0} , 1)
 \end{equation}

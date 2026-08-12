@@ -4,7 +4,7 @@
 Ce document présente les travaux de stage de fin d'année de Master 1 Informatique, parcours Intelligence Artificielle : Fondements et Applications (IAFA) à l'Université de Toulouse. Ce stage s'est déroulé au LAAS-CNRS (Laboratoire d'Analyse et d'Architecture des Systèmes) à Toulouse. Fondé en 1968, le LAAS est une Unité Propre de Recherche (UPR 8001) du CNRS, rattachée aux Instituts Sciences Informatiques et Ingénierie. Le laboratoire est conventionné avec les principaux établissements d'enseignement supérieur de la région : l'Université de Toulouse, l'INSA Toulouse, Toulouse INP et l'ISAE-SUPAERO. Il regroupe environ 650 personnes, comprenant des chercheurs, enseignants-chercheurs, ingénieurs, techniciens, doctorants et post-doctorants.
 
 \bigskip
-Les activités du LAAS-CNRS s'organisent autour de quatre thèmes principaux : l'Automatique, l'Informatique, les Micro et Nano Systèmes, et la Robotique. Ce spectre permet de lier le développement matériel aux algorithmes de décision.
+Les activités du LAAS-CNRS s'organisent autour de quatre thèmes principaux : l'Automatique, l'Informatique, les Micro et Nano Systèmes, et la Robotique. Ce spectre permet de lier le développement matériel aux algorithmes.
 
 \bigskip
 La recherche au LAAS-CNRS s'articule autour de six départements : DO, GE, HOPES, MNBT, RISC et ROB.
@@ -36,7 +36,7 @@ Ce stage s'est déroulé au sein du département Décision et Optimisation (DO),
 
     \item \textbf{La programmation par contraintes :} Exploitation de structures logiques et de relations temporelles.
 
-    \item \textbf{Les méthodes hybrides et décompositions :} Couplage de plusieurs paradigmes (comme la décomposition de Benders logique) pour traiter les problèmes de grande taille.
+    \item \textbf{Les méthodes hybrides et décompositions :} Couplage de plusieurs paradigmes pour traiter les problèmes de grande taille.
 \end{itemize}
 
 \bigskip
@@ -65,10 +65,13 @@ Pour illustrer l'intérêt de cette flexibilité d'allocation (AF), la Figure~\r
     \label{fig:demonstration_af}
 \end{figure}
 
+\vbox{
 Si cette flexibilité permet d'optimiser l'usage des ressources et de réduire le makespan, elle augmente la complexité du problème. Contrairement aux approches classiques où l'affectation est fixe pour toute la durée d'une tâche, la flexibilité impose de valider la faisabilité de l'affectation à chaque unité de temps. Cela génère une combinatoire importante, renforcée par des symétries d'affectation lorsque les opérateurs partagent des compétences identiques. Les solveurs peinent alors à élaguer l'arbre de recherche.
+}
+
 \bigskip
 
-La littérature de la recherche opérationnelle s'est intéressée au problème classique d'ordonnance\-ment de projet sous contraintes de ressources (RCPSP). L'intégration de ressources multi-compéten\-ces, introduite par Bellenguez-Morineau et Néron \cite{bellenguez2007branch, bellenguez2008multi}, a suscité un intérêt croissant, comme le montre la revue de littérature de Snauwaert et Vincke \cite{snauwaert2023classification}. Les approches exactes traditionnelles reposent souvent sur la programmation linéaire en nombres entiers (MILP), étudiée par Almeida et al. \cite{almeida2019modeling}, mais ces formulations présentent des limites de passage à l'échelle lorsque l'horizon s'allonge. Pour y remédier, des approches basées sur la génération de colonnes (Branch-and-Price) ont été explorées \cite{correia2015modeling, montoya2014branch}. Parallèlement, la Programmation par Contraintes (CP) s'est imposée comme une alternative pour modéliser des contraintes complexes \cite{young2017constraint, polo2020mixed}. Néanmoins, ces modèles monolithiques atteignent leurs limites sur des instances de grande taille en raison de la combinatoire induite par la flexibilité. C'est pourquoi la recherche s'oriente vers des méthodes de décomposition hybrides. La Décomposition de Benders basée sur la Logique (LBBD), introduite par Hooker \cite{hooker2000logic, hooker2019logic} et analysée par Cire et al. \cite{cire2016logic}, apparaît comme l'une des méthodes les plus adaptées. Contrairement aux schémas de Benders classiques qui délèguent l'ordonnancement au sous-problème, certaines approches d'ordonnancement multi-compétences inversent ce schéma en résolvant l'ordonnancement global dans le problème maître en CP et l'affectation dans le sous-problème. Cette inversion, introduite par Yi-fan et al. \cite{yi2013new}, a été étendue par Juvin et al. \cite{juvin2026logic} pour modéliser la flexibilité d'affectation (AF) dans le cadre du MS-RCPSP-AF, permettant le remplacement des travailleurs au cours de l'exécution des tâches.
+La littérature de la recherche opérationnelle s'est largement intéressée au problème classique d'or\-donnancement de projet sous contraintes de ressources (RCPSP). L'intégration de ressources multi-compéten\-ces, introduite par Bellenguez-Morineau et Néron \cite{bellenguez2007branch, bellenguez2008multi}, a suscité un intérêt croissant, comme le montre la revue de littérature de Snauwaert et Vincke \cite{snauwaert2023classification}. Les approches exactes traditionnelles reposent souvent sur la programmation linéaire en nombres entiers (MILP), étudiée par Almeida et al. \cite{almeida2019modeling}, mais ces formulations présentent des limites de passage à l'échelle lorsque l'horizon s'allonge. Pour y remédier, des approches basées sur la génération de colonnes (Branch-and-Price) ont été explorées \cite{correia2015modeling, montoya2014branch}. Parallèlement, la Programmation par Contraintes (CP) s'est imposée comme une alternative pour modéliser des contraintes complexes \cite{young2017constraint, polo2020mixed}. Néanmoins, ces modèles monolithiques atteignent leurs limites sur des instances de grande taille en raison de la combinatoire induite par la flexibilité. C'est pourquoi la recherche s'oriente vers des méthodes de décomposition hybrides. La Décomposition de Benders basée sur la Logique (LBBD), introduite par Hooker \cite{hooker2000logic, hooker2019logic} et analysée par Cire et al. \cite{cire2016logic}, apparaît comme l'une des méthodes les plus adaptées. Contrairement aux schémas de Benders classiques qui délèguent l'ordonnancement au sous-problème, certaines approches d'ordonnancement multi-compétences inversent ce schéma en résolvant l'ordonnancement global dans le problème maître en CP et l'affectation dans le sous-problème. Cette inversion, introduite par Yi-fan et al. \cite{yi2013new}, a été étendue par Juvin et al. \cite{juvin2026logic} pour modéliser la flexibilité d'affectation (AF) dans le cadre du MS-RCPSP-AF, permettant le remplacement des travailleurs au cours de l'exécution des tâches.
 \bigskip
 
 
@@ -86,5 +89,5 @@ Ce manuscrit est structuré en quatre chapitres principaux :
 \noindent Le Chapitre 3 présente la Décomposition de Benders basée sur la Logique (LBBD). Ce chapitre détaille la génération de coupes logiques et le couplage entre un problème maître en CP pour l'ordonnancement global et un Sous-Problème d'affectation résolu par flot maximum.
 
 \bigskip
-\noindent Le Chapitre 4 présente l'évaluation expérimentale des approches sur les instances des bibliothèques MSPSP-InstLib et  MSLIB, confirmant la supériorité de la décomposition face à l'explosion combinatoire subit par les modélisations monolithiques. Enfin, un aperçu sur les perspectives de recherche conclut ce manuscrit.
+\noindent Le Chapitre 4 présente l'évaluation expérimentale des approches sur les instances des bibliothèques MSPSP-InstLib et  MSLIB, confirmant la supériorité de la décomposition face à l'explosion combinatoire subie par les modélisations monolithiques. Enfin, un aperçu sur les perspectives de recherche conclut ce manuscrit.
 \bigskip
